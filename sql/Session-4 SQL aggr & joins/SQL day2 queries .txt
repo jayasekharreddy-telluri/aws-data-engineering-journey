@@ -1,0 +1,57 @@
+-- Not equal
+--select order_id, status from orders where status != 'Delivered';
+--select order_id, status from orders where status <> 'Delivered';
+--select order_id, status from orders where NOT status = 'Delivered';
+--select order_id, total_amount, status from orders where status = 'Cancelled' or status = 'Pending' and total_amount > 400;
+
+--select order_id, total_amount, status from orders where (status = 'Cancelled' or status = 'Pending') and total_amount > 400;
+--select order_id, total_amount, status from orders where total_amount between 620 and 700;
+--select order_id, total_amount, status from orders where total_amount not between 620 and 700;
+--select * from customers where city in ('Mumbai', 'Bangalore');
+--select * from customers where city not in ('Mumbai', 'Bangalore');
+
+--select * from customers where customer_id in (1,2,3);
+
+--select name, city from customers where name like 'A%';
+--select name, city from customers where name like 'a%';
+
+--select name, city from customers where name like '%a%';
+
+--select name, cuisine from restaurants where name like '%Biryani%';
+
+--select name from customers where name like '_riya_____';
+
+--select count(*) from orders;
+
+--select * from orders;
+
+--select customer_id, count(*) as total_orders from orders group by customer_id order by total_orders desc;
+
+--select customer_id, count(*) as total_orders, sum(total_amount) as total_spend, round(avg(total_amount),2) as avg_order_value from orders where status = 'Delivered' group by customer_id order by total_spend desc;
+
+--select customer_id, count(*) as total_orders from orders group by customer_id having count(*) > 2; 
+
+--select restaurant_id, count(*) as total_orders, sum(total_amount) as total_spend from orders where status = 'Delivered' group by restaurant_id having count(*) >= 2 and sum(total_amount) > 1000 order by total_spend desc;
+
+--from
+--where
+--group by
+--having
+--select
+--order by
+--limit
+
+--select o.order_id, c.name as customer_name, c.city, o.total_amount, o.status 
+-- from orders o 
+--inner join 
+--customers c 
+--on o.customer_id  = c.customer_id 
+--order by o.total_amount desc;
+
+
+select o.order_id,c.customer_id, c.name as customer_name, c.city, o.total_amount, o.status 
+from orders o 
+right join 
+customers c 
+on o.customer_id  = c.customer_id 
+order by c.customer_id asc;
