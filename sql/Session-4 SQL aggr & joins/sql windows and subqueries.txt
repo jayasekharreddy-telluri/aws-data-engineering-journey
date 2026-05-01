@@ -1,0 +1,37 @@
+
+-- create
+CREATE TABLE employees (
+    id INT,
+    name VARCHAR(50),
+    department VARCHAR(50),
+    salary INT
+);
+
+INSERT INTO employees VALUES
+(1, 'A', 'IT', 5000),
+(2, 'B', 'IT', 6000),
+(3, 'C', 'IT', 4000),
+(4, 'D', 'HR', 3000),
+(5, 'E', 'HR', 3500),
+(6, 'F', 'HR', 3000),
+(7, 'G', 'Sales', 4500),
+(8, 'H', 'Sales', 7000);
+
+
+select* from employees;
+
+select name,department,salary,avg(salary) over(partition by department) from employees;
+
+select name,department,salary,row_number()  over(partition by department order by salary desc) as_row_numeber from employees;
+
+select name,department,salary, dense_rank() over(partition by department order by salary desc) as dense_rank from employees;
+
+select * from  (select name,department,salary,dense_rank() over(partition by department order by salary desc) as dense_rank from employees) where dense_rank <=2;
+
+select name,department,salary,lag(salary) over(partition by department order by salary asc) as prev_salary from employees;
+
+select name,department,salary,lag(salary) over(partition by department order by salary desc) as prev_salary ,
+
+salary - lag(salary) over(partition by department order by salary desc) as diff
+
+from employees;
