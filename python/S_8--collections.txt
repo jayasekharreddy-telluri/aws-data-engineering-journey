@@ -1,0 +1,209 @@
+
+#list
+
+#List items are ordered, changeable, and allow duplicate values.
+
+mylist = ["apple", "banana", "cherry"]
+
+
+
+mylist[1] = "mango"
+
+mylist.append("pine apple")
+
+mylist.insert(0,"ghova")
+
+##remove
+
+mylist.remove("ghova")
+
+mylist.pop()
+
+#del mylist
+
+#looping
+
+for x in mylist:
+    print(x)
+
+#loop through indexing
+
+for i in  range(len(mylist)):
+    print(mylist[i])
+
+# with while
+
+i = 0
+
+while(i < len(mylist)):
+    print(mylist[i])
+    i = i +1
+
+
+
+##sorting
+mylist.sort() # asc
+mylist.sort(reverse = True) # desc
+
+##copying
+
+list2 = mylist.copy()
+
+##Python - Join Lists
+
+list3 = list2+mylist
+or
+
+for x in list2:
+    list3.append(x)
+
+
+Method	        Description
+
+append()	Adds an element at the end of the list
+
+clear()	        Removes all the elements from the list
+
+copy()	        Returns a copy of the list
+
+count()	        Returns the number of elements with the specified value
+
+pop()	        Removes the element at the specified position
+
+remove()	Removes the item with the specified value
+
+reverse()	Reverses the order of the list
+
+sort()	        Sorts the list
+
+del 		del the list
+
+
+#####Python Tuples
+
+#A tuple is a collection which is ordered, Allow Duplicates and unchangeable.
+
+#Tuples are written with round brackets.
+
+mytuple = ("apple", "banana", "cherry")
+
+print(mytuple[2])
+
+print(mytuple[-1])
+
+##convert tuple to list
+
+list = list(mytuple)
+
+print(type(list))
+
+###loops
+
+for x in mytuple:
+    print(x)
+
+###methods
+
+print(mytuple.index("banana"))
+
+print(mytuple.count("banana"))
+
+print(range(len(mytuple)))
+
+
+Method	Description
+
+count()	Returns the number of times a specified value occurs in a tuple
+
+index()	Searches the tuple for a specified value and returns the position of where it was found
+
+
+
+##Python Sets
+
+#A set is a collection which is unordered, unchangeable*,  do not allow duplicate values and unindexed.
+
+#Set items are unchangeable, but you can remove items and add new items.
+
+#Sets are written with curly brackets.
+
+myset = {"apple", "banana", "cherry"}
+
+myset.add("mango")
+
+myset2= {"aplle","alpino"}
+
+myset.update(myset2)
+
+myset.remove("aplle")
+
+print(myset)
+
+
+for x in myset:
+    print(x)
+    
+
+    
+Method	    	Description
+add()	 	   Adds an element to the set
+clear()	 	   Removes all the elements from the set
+copy()	 	   Returns a copy of the set
+pop()	 	   Removes an element from the set
+remove()	   Removes the specified element    
+
+
+
+###Python Dictionaries
+
+ #Dictionaries are used to store data values in key:value pairs.
+ 
+ #A dictionary is a collection which is ordered*, changeable and do not allow duplicates.
+ 
+ #Dictionaries are written with curly brackets, and have keys and values
+
+thisdict = {
+  "brand": "Ford",
+  "model": "Mustang",
+  "year": 1964
+}
+x = thisdict["model"]
+    
+
+print(thisdict.get("year"))
+
+
+print(thisdict.keys())
+
+print(thisdict.values())
+
+print(thisdict.items())
+
+thisdict.update({"year":3333})
+
+thisdict.update({"color":"red"})
+
+thisdict.pop("model")
+print(thisdict.items())
+
+##loop
+
+for x in thisdict:
+    print(thisdict[x])
+
+
+
+| Feature         | List                           | Tuple                         | Set                         | Dictionary                                |
+| --------------- | ------------------------------ | ----------------------------- | --------------------------- | ----------------------------------------- |
+| **Definition**  | Ordered, mutable collection    | Ordered, immutable collection | Unordered, unique elements  | Key-value pair collection                 |
+| **Syntax**      | `[ ]`                          | `( )`                         | `{ }`                       | `{key: value}`                            |
+| **Mutability**  | ✅ Mutable                      | ❌ Immutable                   | ✅ Mutable                   | ✅ Mutable                                 |
+| **Order**       | ✅ Maintains order              | ✅ Maintains order             | ❌ No order (unordered)      | ✅ Maintains insertion order (Python 3.7+) |
+| **Duplicates**  | ✅ Allowed                      | ✅ Allowed                     | ❌ Not allowed               | ❌ Keys unique (values can repeat)         |
+| **Indexing**    | ✅ Yes                          | ✅ Yes                         | ❌ No                        | ❌ Access via keys                         |
+| **Performance** | Slower than set for lookup     | Faster than list (immutable)  | Fast lookup (hashing)       | Fast lookup by key                        |
+| **Use Case**    | When order & duplicates matter | When data should not change   | When uniqueness is required | When mapping keys to values               |
+| **Example**     | `[1, 2, 2, 3]`                 | `(1, 2, 2, 3)`                | `{1, 2, 3}`                 | `{"a": 1, "b": 2}`                        |
+
+
+

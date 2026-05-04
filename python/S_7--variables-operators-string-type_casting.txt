@@ -1,0 +1,168 @@
+""variables
+
+age = 12
+name = 'jai'
+salary = 1232.4
+isMarried = False
+
+print(type(age))
+
+print(salary)
+
+print(isMarried)
+
+print(name)
+
+
+Variable Names :
+
+A variable can have a short name (like x and y) or a more descriptive name (age, carname, total_volume).
+
+Rules for Python variables:
+
+A variable name must start with a letter or the underscore character
+A variable name cannot start with a number
+A variable name can only contain alpha-numeric characters and underscores (A-z, 0-9, and _ )
+Variable names are case-sensitive (age, Age and AGE are three different variables)
+A variable name cannot be any of the Python keywords.
+
+
+x, y , z= 12,'jai',False
+
+print(x)
+print(y)
+print(z)
+
+print(2+4)
+
+print("jbvj"+"vrjb")
+
+print("jbvj " * 4)
+
+
+Python Data Types:
+
+
+age = 12
+name = 'jai'
+salary = 1232.4
+isMarried = False
+
+list = ["jrnj","bknb","brnjnb"] # list
+
+tuple = ("jrjv","jbr","j rj") #tuple
+
+range = range(4)
+
+dict = {
+    
+    "key": "value",
+    
+    "name" : "jai",
+    
+    "age" : 45
+    
+}
+
+set = {"a","b","c"}
+
+
+
+
+
+
+##type casting:
+
+x = 1    # int
+y = 2.8  # float
+z = 1j   # complex
+
+print(type(int(y)))
+
+print(type(complex(y)))
+
+
+##to print  random number
+
+import random
+
+print(random.randrange(1, 10))
+
+
+
+Python Strings::
+
+Strings in python are surrounded by either single quotation marks, or double quotation marks.
+
+'hello' is the same as "hello".
+
+
+
+name = "jai, gud morning"
+
+quote = """
+ alwst be stong
+
+"""
+
+print(name)
+print(quote)
+print(name[2])
+
+#loop through string
+
+for x in name:
+    print(x)
+
+#string length
+
+print(len(name))
+
+
+#Python - Slicing Strings
+
+slic = "heloo world";
+
+print(slic[:4])
+
+print(slic[2:])
+
+print(slic[-1])
+
+print(slic[-3:-1])
+
+print(slic[-3:])
+
+
+
+
+
+
+
+#Python - Modify Strings
+
+word = "  hellow world  "
+
+print(word.upper())
+
+print(word.strip())
+
+txt = "We are the so-called \"Vikings\" from the north."
+
+print(txt)
+
+txt = "We are the so-called \"Vikings\" from the north."
+
+print(txt)
+
+print(word.count("a"))
+
+print(word.startswith("h"))
+
+print(word.endswith("e"))
+
+print(word.find("a"))
+
+print(word.find("w"))
+
+print(word.split(" "))
