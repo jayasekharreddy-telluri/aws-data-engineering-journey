@@ -35,3 +35,38 @@ select name,department,salary,lag(salary) over(partition by department order by 
 salary - lag(salary) over(partition by department order by salary desc) as diff
 
 from employees;
+
+
+
+practise -- 1
+
+
+1. Find all employees whose salary is greater than 50000.
+
+2. Find all employees who belong to the IT department.
+
+3. Find employees whose salary is greater than the average salary of all employees.
+
+4. Find employees whose salary is greater than the average salary of their own department.
+
+5. Find the second highest salary using a subquery.
+
+6. Find employees whose salary is greater than department average using a window function.
+
+7. Find the second highest salary using a window function.
+
+8. Find the top 3 highest-paid employees in each department.
+
+9. Find the cumulative salary (running total).
+
+10. Find the difference between current salary and previous salary.
+
+11. Find employees who have the highest salary in their department.
+
+12. Divide employees into 4 salary groups.
+
+
+
+
+
+

@@ -1,0 +1,65 @@
+
+--basic exmple--
+--with employees_cte as (
+--select * from employees where department = 'IT'
+--)
+
+--select * from employees_cte where salary > 4500;
+
+
+--avg salary--
+
+WITH avg_salary AS (
+    SELECT AVG(salary) AS avg_sal
+    FROM employees
+)
+
+SELECT *
+FROM employees e, avg_salary a
+WHERE e.salary > a.avg_sal;
+
+
+Problem 2:
+
+👉 Find department-wise average salary using CTE
+
+with employees_dept_avg_ct as (select department,avg(salary) as avg_sal from employees group by department)
+
+select*  from employees_dept_avg_ct;
+
+
+Problem 3:
+
+👉 Find employees earning more than their department average
+
+with employees_dept_avg_ct as (select department,avg(salary) as avg_sal from
+employees group by department)
+
+select e.name,e.department,e.salary from employees e join  employees_dept_avg_ct a on 
+e.department = a.department
+where e.salary > a.avg_sal;
+
+
+Problem 4:
+
+👉 Find top 2 highest salaries in each department
+
+
+with ranked_employes as ( select name, department, salary, dense_rank() over 
+(
+  partition by department order by salary desc
+) as ranks from employees
+)
+ 
+select name,department,salary from  ranked_employes  where  ranks <=2;
+
+
+6. Employee Hierarchy (Recursive CTE)
+
+7. Remove Duplicates using CTE
+
+8.Running Total of Salary
+
+9. Gaps & Islands (Consecutive Join Dates) 🔥🔥
+
+🔴 10. Sessionization Problem 🔥🔥

@@ -55,3 +55,29 @@ right join
 customers c 
 on o.customer_id  = c.customer_id 
 order by c.customer_id asc;
+
+
+practised quqsations:
+
+set one:
+
+Get all employees from IT department
+Get employees with salary greater than 5000 sorted by salary in descending order
+Get unique departments
+Get employees whose name starts with 'A'
+Get employees whose salary is between 4000 and 6000
+Count total number of employees
+Find average salary of employees
+Find total salary paid per department
+Find departments where total salary is greater than 10000
+Find maximum salary in each department
+Find minimum salary in each department
+Find number of employees in each department
+Find departments having more than 2 employees
+Get employees who do not belong to IT department
+Get employees whose salary is not between 4000 and 6000
+Get employees whose department is either IT or HR
+Get employees whose name contains 'A' anywhere
+Get top 3 highest paid employees
+Get employees sorted by department ascending and salary descending
+Find total salary of all employees
