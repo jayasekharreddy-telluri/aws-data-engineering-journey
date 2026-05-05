@@ -65,6 +65,40 @@ practise -- 1
 
 12. Divide employees into 4 salary groups.
 
+practise -- 2
+
+
+1. Write a query to display each employee along with total number of employees.
+
+2. Display each employee with total employees in their department.
+
+3. Show each employee with a row number based on salary (highest salary = 1).
+
+4. Show rank of employees based on salary (same salary = same rank).
+
+5. Find highest salary employee in each department.
+
+6. Find 2nd highest salary employee in each department.
+
+7. Find difference between current salary and previous employee salary (within department).
+
+8. Find next employee salary within each department.
+
+9. Calculate running total of salary (overall).
+
+10. Calculate running total of salary based on joining date.
+
+11. Calculate running total of salary within each department.
+
+12. Find employees whose salary is greater than previous employee salary (within department).
+
+13. Show each employee with highest salary in their department (without filtering rows).
+
+14. Show first salary in each department (based on highest salary).
+
+15. Show last salary in each department.
+
+16. Divide employees into 3 equal salary groups (buckets).
 
 
 
