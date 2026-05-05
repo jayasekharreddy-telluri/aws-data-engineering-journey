@@ -1,0 +1,108 @@
+
+a = 20;
+
+if a > 40:
+    print(" i am older")
+elif a > 20:
+    print(" i am middile age")
+elif a > 10:
+    print(" i am young")
+else:
+    print("i am alive")
+
+## nested if
+
+b = 30
+
+if b > 10:
+    if b > 20:
+        print(" b > 20")
+        if b > 30:
+            print(" b is > 30")
+        else:
+            print(" b is < 30")
+    else:
+        print("b < 20")
+
+else:
+    print("b < 10")
+
+
+
+## while loop
+
+number = 0
+
+while number < 4:
+    print(number)
+    if number == 3:
+        print("i am breaking")
+    number = number+ 1
+    
+count = 0
+
+while count < 5:
+    
+    print(count)
+    
+    if count == 4:
+        print("continue statemnt satified")
+    
+    count = count + 1
+    
+    
+i = 1
+while i < 6:
+  print(i)
+  i += 1
+else:
+  print("i is no longer less than 6")
+
+
+
+## for loop
+
+fruits = ["apple", "banana", "cherry"]
+
+for x in fruits:
+    print(x)
+    
+word = "banana"
+
+for x in word:
+    
+    print(x)
+
+
+
+## range
+
+for n in range(6):
+    
+    print(n)
+    
+for n in range(0,6,2):
+    
+    print(n)
+
+## nested loops
+
+for i in range(3):
+    
+    for j in range(2):
+    
+        print( str(i) + " " + str(j))
+
+## functions
+
+def greeting():
+    print("hellow")
+
+greeting()
+    
+
+def greeting(name):
+    print("hellow "+ name)
+
+greeting("jai")
+    
