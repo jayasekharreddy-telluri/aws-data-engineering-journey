@@ -1,0 +1,9 @@
+order_item_id,order_id,item_name,quantity,price
+OI401,O301,Chicken Pizza,1,550
+OI402,O302,Hyderabadi Biryani,2,360
+OI403,O303,Burger Combo,1,300
+OI404,O304,Paneer Curry,2,240
+OI405,O305,Masala Dosa,2,125
+OI406,O306,Farmhouse Pizza,1,640
+OI407,O307,Mutton Biryani,2,445
+OI408,O308,Cheese Burger,2,380

@@ -1,0 +1,489 @@
+# AWS Glue Day 1 — Proper Notes (Concept + Interview Focus)
+
+# 1. Big Picture First
+
+## Problem Before AWS Glue
+
+Company has raw files in:
+
+Amazon S3
+
+Example:
+
+* CSV
+* JSON
+* Logs
+* Parquet
+
+Problems:
+
+* No schema
+* No metadata
+* Cannot run SQL directly easily
+* Nobody knows column structure
+
+---
+
+# AWS Solution
+
+```text id="y2v7mk"
+S3
+ ↓
+Glue Crawler
+ ↓
+Glue Data Catalog
+ ↓
+Athena
+```
+
+This is the MOST IMPORTANT AWS Data Lake architecture.
+
+Memorize this.
+
+---
+
+# 2. What is AWS Glue?
+
+AWS Glue is a:
+
+```text id="n4w0ja"
+Serverless data integration service
+```
+
+Used for:
+
+* Discovering data
+* Cataloging metadata
+* Transforming data
+* Scheduling pipelines
+
+---
+
+# 3. The 4 Pillars of Glue
+
+| Pillar             | Purpose         | Real Usage             |
+| ------------------ | --------------- | ---------------------- |
+| Crawlers           | Discover schema | Scan raw S3 files      |
+| Data Catalog       | Store metadata  | Athena reads from here |
+| ETL Jobs           | Transform data  | CSV → Parquet          |
+| Workflows/Triggers | Scheduling      | Daily pipelines        |
+
+---
+
+# 4. MOST IMPORTANT CONCEPT
+
+## Glue DOES NOT Store Data
+
+```text id="t8k1vz"
+Glue Catalog stores ONLY metadata.
+```
+
+Actual data remains in:
+
+Amazon S3
+
+---
+
+# Best Analogy
+
+```text id="j6r0yd"
+Glue Catalog = Library index card
+S3 = Actual books
+```
+
+Interviewers LOVE this analogy.
+
+---
+
+# 5. What is a Glue Crawler?
+
+## Definition
+
+```text id="x0z5mg"
+A Glue crawler scans data sources, infers schema and partitions, and creates metadata tables in the Glue Catalog.
+```
+
+---
+
+# Internally What Crawler Does
+
+```text id="p7n2wd"
+1. Opens S3 folder
+2. Samples files
+3. Detects file format
+4. Reads headers
+5. Infers data types
+6. Detects partitions
+7. Creates catalog tables
+```
+
+---
+
+# 6. Important Crawler Interview Point
+
+## Crawlers are NOT perfect
+
+Example:
+
+```text id="m2v6ks"
+One bad row with "N/A"
+can convert DOUBLE column into STRING.
+```
+
+Very famous production issue.
+
+---
+
+# Production Best Practice
+
+Never allow crawler to overwrite schemas blindly.
+
+Safer option:
+
+```text id="k9f2ux"
+Add new columns only
+```
+
+---
+
+# 7. What is Glue Data Catalog?
+
+## Definition
+
+```text id="r5q0cl"
+Central metadata repository for AWS analytics services.
+```
+
+Stores:
+
+* Databases
+* Tables
+* Columns
+* Partitions
+* S3 locations
+* SerDe info
+
+---
+
+# Catalog Hierarchy
+
+```text id="u8x4hn"
+Catalog
+   ↓
+Database
+   ↓
+Table
+```
+
+---
+
+# 8. What is a Glue Table?
+
+## MOST IMPORTANT UNDERSTANDING
+
+```text id="h1y7pk"
+Glue table = metadata pointer to S3 data
+```
+
+NOT actual storage.
+
+Contains:
+
+* S3 path
+* File format
+* Columns
+* Data types
+* Partitions
+* SerDe
+
+---
+
+# 9. What is SerDe?
+
+## Definition
+
+```text id="s3v0jc"
+SerDe = Serializer/Deserializer
+```
+
+It tells Athena:
+
+```text id="e7n4af"
+How to read file format
+```
+
+Example:
+
+* CSV → OpenCSVSerde
+* Parquet → ParquetHiveSerDe
+
+---
+
+# 10. What is Athena?
+
+Amazon Athena is:
+
+```text id="d0x6kr"
+Serverless SQL query engine for S3
+```
+
+Athena reads metadata from:
+
+```text id="q4j9yw"
+Glue Data Catalog
+```
+
+---
+
+# 11. Athena Architecture
+
+```text id="a9m3zf"
+S3 stores files
+Glue stores metadata
+Athena runs SQL
+```
+
+---
+
+# 12. MOST ASKED ATHENA QUESTION
+
+## How does Athena charge?
+
+```text id="v5n8lt"
+Athena charges based on DATA SCANNED.
+```
+
+Pricing:
+
+```text id="w7r1pd"
+~$5 per TB scanned
+```
+
+NOT based on runtime.
+
+---
+
+# 13. Why Parquet Over CSV?
+
+## SUPER IMPORTANT INTERVIEW QUESTION
+
+| CSV            | Parquet       |
+| -------------- | ------------- |
+| Row-based      | Columnar      |
+| No compression | Compressed    |
+| High scan cost | Low scan cost |
+| Slow           | Fast          |
+| Weak typing    | Strong typing |
+
+---
+
+# Best Interview Answer
+
+```text id="c2q7vn"
+Parquet is columnar and compressed, so Athena scans less data, improving performance and reducing cost.
+```
+
+Memorize this EXACT line.
+
+---
+
+# 14. Why We Need ETL
+
+Raw CSV problems:
+
+* Wrong data types
+* Null issues
+* No partitioning
+* Expensive Athena scans
+* Slow queries
+
+ETL fixes:
+
+* Schema
+* Cleansing
+* Partitioning
+* Compression
+* Parquet conversion
+
+---
+
+# 15. Partitions
+
+## Definition
+
+```text id="n6k1sx"
+Partitions split data into folders for faster query pruning.
+```
+
+Example:
+
+```text id="t0p4me"
+year=2024/month=05/day=20/
+```
+
+---
+
+# Why Partitions Matter
+
+Without partition:
+
+```text id="b5z8xa"
+Athena scans ALL files
+```
+
+With partition:
+
+```text id="u1r6wd"
+Athena scans only required folders
+```
+
+Huge cost savings.
+
+---
+
+# 16. AWS Data Lake Formula
+
+## MOST IMPORTANT DAY 1 MEMORY
+
+```text id="q7f2oj"
+S3 + Glue Catalog + Athena
+= AWS Serverless Data Lake
+```
+
+---
+
+# 17. Azure → AWS Mapping
+
+| Azure              | AWS          |
+| ------------------ | ------------ |
+| ADF                | Glue         |
+| Purview            | Glue Catalog |
+| Synapse Serverless | Athena       |
+| Synapse Dedicated  | Redshift     |
+
+---
+
+# 18. Real Production Architecture
+
+```text id="y3p7kr"
+Raw CSV in S3
+      ↓
+Glue Crawler
+      ↓
+Glue Catalog
+      ↓
+Athena Queries
+      ↓
+Glue ETL
+      ↓
+Parquet + Partitions
+      ↓
+Optimized Analytics
+```
+
+---
+
+# 19. Day 1 Practical Flow You Did
+
+```text id="g9t2lu"
+1. Created S3 bucket
+2. Uploaded CSVs
+3. Created IAM role
+4. Created Glue database
+5. Created crawler
+6. Ran crawler
+7. Created catalog tables
+8. Queried with Athena
+```
+
+This is REAL AWS Data Engineering work.
+
+---
+
+# 20. Short Interview Questions (Crispy Answers)
+
+---
+
+## What is AWS Glue?
+
+```text id="p0d7wv"
+AWS Glue is a serverless data integration service used for schema discovery, metadata management, ETL, and workflow orchestration.
+```
+
+---
+
+## What is a Glue Crawler?
+
+```text id="j8v3fn"
+A crawler scans data sources, infers schema, and creates metadata tables in the Glue Data Catalog.
+```
+
+---
+
+## Does Glue store actual data?
+
+```text id="m5q1zk"
+No. Glue stores only metadata. Actual data remains in S3.
+```
+
+---
+
+## What is Glue Catalog?
+
+```text id="d2n9yx"
+Glue Catalog is a centralized metadata repository used by Athena, Glue ETL, EMR, and Redshift.
+```
+
+---
+
+## What is Athena?
+
+```text id="v1x7pf"
+Athena is a serverless SQL query engine that runs SQL directly on S3 data.
+```
+
+---
+
+## Why use Parquet?
+
+```text id="e0w4kr"
+Parquet reduces Athena scan cost and improves performance because it is compressed and columnar.
+```
+
+---
+
+## What is SerDe?
+
+```text id="r4j8mt"
+SerDe defines how Athena reads and writes specific file formats.
+```
+
+---
+
+## Why partitions?
+
+```text id="f7n2ca"
+Partitions reduce scanned data by allowing Athena to read only relevant folders.
+```
+
+---
+
+## Why crawlers can be risky?
+
+```text id="u3m9zd"
+Crawlers may incorrectly infer schema from malformed data and break downstream queries.
+```
+
+---
+
+# 21. Final Mental Model
+
+```text id="x9v5pl"
+S3 = Storage
+Glue Catalog = Metadata
+Crawler = Schema discovery
+Athena = SQL engine
+Glue ETL = Data transformation
+```
+
+If this mental model is crystal clear, AWS Glue becomes very easy.

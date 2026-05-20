@@ -1,0 +1,9 @@
+order_id,customer_id,restaurant_id,order_date,status,total_amount
+O301,C101,R202,2024-11-01,Delivered,550
+O302,C102,R201,2024-11-01,Delivered,720
+O303,C103,R205,2024-11-02,Cancelled,300
+O304,C104,R203,2024-11-02,Delivered,480
+O305,C105,R204,2024-11-03,Delivered,250
+O306,C106,R202,2024-11-03,Delivered,640
+O307,C107,R201,2024-11-04,Pending,890
+O308,C108,R205,2024-11-04,Delivered,760
