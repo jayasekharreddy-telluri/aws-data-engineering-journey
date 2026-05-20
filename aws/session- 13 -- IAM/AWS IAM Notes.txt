@@ -1,0 +1,598 @@
+# AWS IAM Notes — Easy Conceptual + Interview Revision
+
+# 1. What is IAM?
+
+IAM = Identity and Access Management.
+
+IAM controls:
+
+```text id="ddv6pb"
+WHO can do WHAT on WHICH resource
+```
+
+---
+
+# One-Line Definition
+
+```text id="rkx52v"
+IAM decides whether an identity is allowed to perform an action on an AWS resource.
+```
+
+---
+
+# Real Example
+
+```text id="38gf6u"
+Can Glue read S3 bucket?
+Can Arjun create EC2?
+Can Lambda access DynamoDB?
+```
+
+IAM checks all of this.
+
+---
+
+# MOST IMPORTANT UNDERSTANDING
+
+```text id="n0ttwt"
+Nothing happens in AWS until IAM says YES.
+```
+
+---
+
+# 2. The 4 Pillars of IAM
+
+These are the foundation.
+
+| Pillar | Meaning             |
+| ------ | ------------------- |
+| User   | Human identity      |
+| Group  | Collection of users |
+| Policy | Permission document |
+| Role   | Temporary identity  |
+
+---
+
+# Easy Memory Trick
+
+```text id="p1w0yt"
+User → Person
+Group → Team
+Policy → Rules
+Role → Temporary power
+```
+
+---
+
+# 3. IAM User
+
+User = identity for a human/program.
+
+Example:
+
+```text id="h0o93l"
+arjun-sharma
+```
+
+Users can have:
+
+* Password
+* Access keys
+
+---
+
+# Real Understanding
+
+```text id="04vffk"
+User logs into AWS console.
+```
+
+---
+
+# Interview Answer
+
+```text id="c31oel"
+An IAM User is a permanent identity created for a person or application.
+```
+
+---
+
+# 4. IAM Group
+
+Group = collection of users.
+
+Example:
+
+```text id="o8e10s"
+DataEngineers
+```
+
+---
+
+# Why Groups?
+
+Instead of attaching permissions one-by-one:
+
+```text id="6rdp3r"
+Attach once to group → all users inherit permissions
+```
+
+---
+
+# Flow
+
+```text id="rgnm4n"
+User → joins Group → gets permissions
+```
+
+---
+
+# Interview Answer
+
+```text id="6k06e3"
+An IAM Group is a collection of users sharing the same permissions.
+```
+
+---
+
+# 5. IAM Policy
+
+Policy = JSON permission document.
+
+This is the REAL permission logic.
+
+---
+
+# Policy Structure
+
+```json id="g8s1wx"
+{
+  "Effect": "Allow",
+  "Action": "s3:GetObject",
+  "Resource": "arn:aws:s3:::mybucket/*"
+}
+```
+
+---
+
+# Core Components
+
+| Field    | Meaning            |
+| -------- | ------------------ |
+| Effect   | Allow/Deny         |
+| Action   | What operation     |
+| Resource | Which AWS resource |
+
+---
+
+# Easy Memory Trick
+
+```text id="8i48j0"
+Effect → Allow or block
+Action → What to do
+Resource → Where
+```
+
+---
+
+# Interview Answer
+
+```text id="lqz3yy"
+IAM Policies are JSON documents that define permissions in AWS.
+```
+
+---
+
+# 6. IAM Role
+
+MOST IMPORTANT FOR DATA ENGINEERS.
+
+Role = temporary identity assumed by AWS services.
+
+Examples:
+
+* Glue
+* Lambda
+* EC2
+* Redshift
+
+---
+
+# Golden Line
+
+```text id="yjlwmr"
+A User logs in.
+A Role is worn.
+```
+
+---
+
+# Why Roles?
+
+AWS services should NOT use permanent access keys.
+
+Instead:
+
+```text id="p3w7lz"
+Service temporarily assumes a role
+```
+
+---
+
+# Real Flow
+
+```text id="u44mng"
+Glue Job
+   ↓
+Assumes Role
+   ↓
+Gets temporary credentials
+   ↓
+Accesses S3
+```
+
+---
+
+# Interview Answer
+
+```text id="fz4b7p"
+An IAM Role is a temporary identity assumed by AWS services, users, or accounts.
+```
+
+---
+
+# 7. STS AssumeRole
+
+STS = Security Token Service.
+
+AssumeRole means:
+
+```text id="ck8j7m"
+Temporarily becoming another role.
+```
+
+---
+
+# Real Flow
+
+```text id="1v2yqr"
+Glue
+   ↓
+STS AssumeRole
+   ↓
+Temporary credentials
+```
+
+---
+
+# Why Important?
+
+Instead of hardcoding secrets:
+
+* Secure
+* Auto-expiry
+* Recommended by AWS
+
+---
+
+# Interview Answer
+
+```text id="m2e2g9"
+STS AssumeRole provides temporary credentials by allowing an identity to assume an IAM role.
+```
+
+---
+
+# 8. Trust Policy
+
+Trust policy defines:
+
+```text id="3gmj2y"
+WHO can assume the role
+```
+
+---
+
+# Example
+
+```json id="h8kp2v"
+"Principal": {
+   "Service": "glue.amazonaws.com"
+}
+```
+
+Meaning:
+Only Glue can use this role.
+
+---
+
+# Interview Answer
+
+```text id="2o0m92"
+A trust policy controls which users or services can assume an IAM role.
+```
+
+---
+
+# 9. Permission Policy vs Trust Policy
+
+VERY IMPORTANT.
+
+| Trust Policy        | Permission Policy |
+| ------------------- | ----------------- |
+| WHO can assume role | WHAT role can do  |
+
+---
+
+# Easy Memory Trick
+
+```text id="upj9kt"
+Trust = Who enters
+Permission = What they can do inside
+```
+
+---
+
+# 10. Least Privilege
+
+Grant ONLY required permissions.
+
+---
+
+# Bad Practice
+
+```json id="xk0a0y"
+"Action": "*",
+"Resource": "*"
+```
+
+---
+
+# Good Practice
+
+```json id="lbyv3w"
+"Action": "s3:GetObject",
+"Resource": "arn:aws:s3:::orders/*"
+```
+
+---
+
+# Interview Answer
+
+```text id="0z0qwr"
+Least privilege means granting only the minimum permissions required to perform a task.
+```
+
+---
+
+# 11. Explicit Deny
+
+MOST IMPORTANT SECURITY RULE.
+
+```text id="a0p17q"
+Explicit Deny always overrides Allow.
+```
+
+---
+
+# AWS Evaluation Logic
+
+```text id="r4lmqj"
+Explicit Deny → Immediate Block
+Else Allow → Allowed
+Else → Denied by default
+```
+
+---
+
+# Easy Memory Trick
+
+```text id="j96hxf"
+Allow opens door.
+Explicit Deny locks it permanently.
+```
+
+---
+
+# Interview Answer
+
+```text id="u2twjm"
+Explicit Deny always takes precedence over Allow permissions in IAM.
+```
+
+---
+
+# 12. S3 ARN Gotcha
+
+VERY COMMON INTERVIEW QUESTION.
+
+---
+
+# Bucket-Level ARN
+
+Used for:
+
+* ListBucket
+
+Example:
+
+```text id="tjlwm1"
+arn:aws:s3:::mybucket
+```
+
+---
+
+# Object-Level ARN
+
+Used for:
+
+* GetObject
+* PutObject
+
+Example:
+
+```text id="b1z2sq"
+arn:aws:s3:::mybucket/*
+```
+
+---
+
+# Golden Rule
+
+```text id="gb1kk6"
+S3 policies usually need BOTH ARNs.
+```
+
+---
+
+# 13. Managed Policy vs Inline Policy
+
+| Managed Policy   | Inline Policy             |
+| ---------------- | ------------------------- |
+| Reusable         | One identity only         |
+| Separate object  | Embedded directly         |
+| Better for teams | Better for one-off access |
+
+---
+
+# Interview Answer
+
+```text id="v30p7l"
+Managed policies are reusable, whereas inline policies are attached directly to a single identity.
+```
+
+---
+
+# 14. Real Glue IAM Flow
+
+MOST IMPORTANT REAL-WORLD FLOW.
+
+```text id="8k6jlu"
+Glue Job
+   ↓
+Assumes Glue Role
+   ↓
+Gets temporary credentials
+   ↓
+Accesses S3
+```
+
+---
+
+# 15. AccessDenied Debugging Flow
+
+When you see:
+
+```text id="qk3m6t"
+AccessDenied
+```
+
+Check:
+
+| Step | Question              |
+| ---- | --------------------- |
+| 1    | WHO is calling?       |
+| 2    | WHAT action?          |
+| 3    | WHICH resource?       |
+| 4    | Policy allows it?     |
+| 5    | Any Explicit Deny?    |
+| 6    | Trust policy correct? |
+
+---
+
+# 16. Real Things YOU Created
+
+## IAM Group
+
+```text id="w4rgt8"
+DataEngineers
+```
+
+## S3 Bucket
+
+```text id="n0o1tx"
+jai-de-learning-bucket
+```
+
+## Folders
+
+```text id="z8r6sd"
+raw/
+processed/
+archive/
+logs/
+```
+
+## Glue Role
+
+```text id="g0jlwm"
+GlueServiceRole-SwiggyOrders
+```
+
+---
+
+# 17. MOST IMPORTANT INTERVIEW QUESTIONS
+
+## Q1. Difference between User and Role?
+
+| User                 | Role                  |
+| -------------------- | --------------------- |
+| Permanent identity   | Temporary identity    |
+| Humans               | AWS services          |
+| Password/access keys | Temporary credentials |
+
+---
+
+## Q2. Why use Roles instead of Access Keys?
+
+```text id="lk6h3f"
+Roles provide temporary credentials and improve security by avoiding hardcoded secrets.
+```
+
+---
+
+## Q3. What is AssumeRole?
+
+```text id="xrdq0l"
+AssumeRole allows temporary access to an IAM role using STS.
+```
+
+---
+
+## Q4. What is Explicit Deny?
+
+```text id="djlwm2"
+Explicit Deny overrides all Allow permissions.
+```
+
+---
+
+## Q5. What is Least Privilege?
+
+```text id="ztv30v"
+Grant only required permissions and nothing extra.
+```
+
+---
+
+## Q6. Why does Glue need a Role?
+
+```text id="u8m7ji"
+Glue needs a role to access AWS resources like S3 and CloudWatch securely.
+```
+
+---
+
+# Final Golden Summary
+
+```text id="4fyv2p"
+User = Human
+Group = Team
+Policy = Rules
+Role = Temporary AWS service identity
+STS = Gives temporary credentials
+Trust Policy = WHO can assume
+Permission Policy = WHAT can be done
+Explicit Deny = Always wins
+Least Privilege = Minimum required access
+```
