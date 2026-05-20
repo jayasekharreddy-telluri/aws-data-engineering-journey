@@ -1,0 +1,10 @@
+I created your connected practical notes for S3 Data Engineering with:
+
+* less theory
+* more practical understanding
+* topic connections
+* interview-important points
+* real DE pipeline flow
+* production mindset
+
+These notes are structured exactly for revision + interview preparation.
