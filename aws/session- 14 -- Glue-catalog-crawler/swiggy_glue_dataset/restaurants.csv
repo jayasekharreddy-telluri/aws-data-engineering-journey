@@ -1,7 +1,201 @@
-restaurant_id,restaurant_name,city,cuisine
-R201,Biryani House,Hyderabad,Hyderabadi
-R202,Pizza World,Bangalore,Italian
-R203,Spice Hub,Delhi,North Indian
-R204,Dosa Point,Chennai,South Indian
-R205,Burger Town,Mumbai,Fast Food
-R206,Andhra Meals,Vijayawada,Andhra
+restaurant_id,name,city,cuisine,rating
+101,Sushi Station - Mumbai,Mumbai,Japanese,4.0
+102,Rolls Mania - Pune,Pune,Pizza,3.7
+103,Naturals Ice Cream - Chennai,Chennai,Street Food,4.6
+104,Saravana Bhavan - Hyderabad,Hyderabad,Street Food,4.6
+105,Starbucks - Kolkata,Kolkata,Biryani,4.2
+106,Rolls Mania - Ahmedabad,Ahmedabad,Snacks,4.2
+107,Noodle Nook - Chennai,Chennai,Italian,3.7
+108,Punjabi Tadka - Delhi,Delhi,Continental,3.5
+109,A2B - Bangalore,Bangalore,Chinese,4.2
+110,Pizza Palace - Ahmedabad,Ahmedabad,Pizza,4.3
+111,Pizza Hut - Bangalore,Bangalore,Italian,4.6
+112,Tea Villa - Chennai,Chennai,Snacks,4.6
+113,Behrouz Biryani - Mumbai,Mumbai,Snacks,4.2
+114,Box8 - Delhi,Delhi,North Indian,4.8
+115,Dosa Express - Ahmedabad,Ahmedabad,Italian,4.0
+116,Pizza Hut - Pune,Pune,Rolls,4.1
+117,Dosa Express - Bangalore,Bangalore,Desserts,4.7
+118,Paradise Biryani - Delhi,Delhi,Continental,3.9
+119,McDonald's - Delhi,Delhi,Italian,4.3
+120,Punjabi Tadka - Hyderabad,Hyderabad,Snacks,4.2
+121,Paradise Biryani - Delhi,Delhi,Pizza,3.9
+122,Biryani By Kilo - Ahmedabad,Ahmedabad,Biryani,4.6
+123,Haldiram's - Mumbai,Mumbai,North Indian,4.3
+124,Rolls & Wraps - Pune,Pune,Biryani,4.6
+125,Biryani By Kilo - Bangalore,Bangalore,Beverages,4.0
+126,Naturals Ice Cream - Mumbai,Mumbai,Biryani,4.1
+127,Burger Barn - Hyderabad,Hyderabad,Mughlai,3.8
+128,Barbeque Nation - Hyderabad,Hyderabad,Chinese,4.7
+129,Idli House - Mumbai,Mumbai,North Indian,4.3
+130,Dosa Express - Delhi,Delhi,Burgers,4.3
+131,Chai Point - Mumbai,Mumbai,Snacks,4.3
+132,Pizza Hut - Mumbai,Mumbai,Pizza,4.0
+133,Pav Bhaji King - Pune,Pune,Italian,4.5
+134,Oven Story - Mumbai,Mumbai,Beverages,3.7
+135,Barbeque Nation - Mumbai,Mumbai,Burgers,3.8
+136,Cafe Coffee Day - Pune,Pune,Chinese,4.7
+137,Chilis - Bangalore,Bangalore,Street Food,3.6
+138,Ammi's Biryani - Delhi,Delhi,Mughlai,4.4
+139,Chole Bhature Hub - Chennai,Chennai,Italian,4.3
+140,The Good Bowl - Bangalore,Bangalore,Snacks,4.1
+141,KFC - Pune,Pune,Desserts,4.2
+142,Barbeque Nation - Delhi,Delhi,Beverages,3.8
+143,Subway - Mumbai,Mumbai,Rolls,4.4
+144,Nandos - Bangalore,Bangalore,North Indian,4.4
+145,Wow Momo - Pune,Pune,Snacks,3.8
+146,A2B - Kolkata,Kolkata,Street Food,4.8
+147,Chilis - Pune,Pune,Burgers,4.8
+148,Empire - Hyderabad,Hyderabad,Japanese,4.0
+149,Noodle Nook - Mumbai,Mumbai,Desserts,4.7
+150,Chai Point - Mumbai,Mumbai,Chinese,4.4
+151,Chai Point - Mumbai,Mumbai,Desserts,4.4
+152,Box8 - Chennai,Chennai,Mughlai,4.1
+153,Idli House - Bangalore,Bangalore,North Indian,3.8
+154,Barbeque Nation - Delhi,Delhi,Burgers,4.1
+155,Dosa Express - Bangalore,Bangalore,Street Food,3.7
+156,Box8 - Pune,Pune,Street Food,4.4
+157,Meghana Foods - Hyderabad,Hyderabad,South Indian,4.8
+158,Punjabi Tadka - Pune,Pune,South Indian,4.7
+159,Chole Bhature Hub - Mumbai,Mumbai,Desserts,4.7
+160,Chai Point - Kolkata,Kolkata,Chinese,4.1
+161,Empire - Pune,Pune,Mughlai,3.7
+162,A2B - Delhi,Delhi,Italian,4.2
+163,Biryani By Kilo - Kolkata,Kolkata,Street Food,4.2
+164,Chole Bhature Hub - Mumbai,Mumbai,Italian,4.6
+165,Pizza Hut - Mumbai,Mumbai,Pizza,4.6
+166,A2B - Mumbai,Mumbai,Burgers,3.8
+167,Pav Bhaji King - Bangalore,Bangalore,Street Food,4.1
+168,Box8 - Pune,Pune,South Indian,4.2
+169,Burger King - Chennai,Chennai,Italian,3.9
+170,Naturals Ice Cream - Delhi,Delhi,Mughlai,4.8
+171,Noodle Nook - Mumbai,Mumbai,Biryani,4.6
+172,Pizza Palace - Hyderabad,Hyderabad,South Indian,4.7
+173,Tea Villa - Pune,Pune,South Indian,4.5
+174,Tea Villa - Mumbai,Mumbai,Pizza,3.9
+175,Leon's - Mumbai,Mumbai,Italian,4.2
+176,Faasos - Pune,Pune,Pizza,3.5
+177,Subway - Kolkata,Kolkata,Street Food,3.9
+178,Anjappar - Mumbai,Mumbai,Japanese,4.7
+179,Paradise Biryani - Kolkata,Kolkata,Beverages,4.7
+180,Saravana Bhavan - Hyderabad,Hyderabad,South Indian,3.9
+181,Chole Bhature Hub - Pune,Pune,Snacks,4.2
+182,Chai Point - Kolkata,Kolkata,Beverages,4.5
+183,Pav Bhaji King - Pune,Pune,Street Food,4.2
+184,KFC - Delhi,Delhi,Beverages,4.1
+185,Pizza Palace - Chennai,Chennai,American,4.4
+186,Starbucks - Bangalore,Bangalore,Pizza,3.8
+187,Barbeque Nation - Mumbai,Mumbai,Chinese,3.7
+188,Faasos - Delhi,Delhi,Continental,4.7
+189,Cafe Mocha - Delhi,Delhi,Beverages,4.1
+190,A2B - Bangalore,Bangalore,American,4.5
+191,Pizza Hut - Pune,Pune,Japanese,3.6
+192,Burger King - Bangalore,Bangalore,Pizza,4.8
+193,Ammi's Biryani - Mumbai,Mumbai,North Indian,4.8
+194,Starbucks - Hyderabad,Hyderabad,Mughlai,4.8
+195,Fresh Menu - Bangalore,Bangalore,American,3.6
+196,Pind Balluchi - Delhi,Delhi,Street Food,3.7
+197,Burger King - Bangalore,Bangalore,Italian,3.5
+198,Wow Momo - Delhi,Delhi,Rolls,4.7
+199,Punjabi Tadka - Bangalore,Bangalore,Japanese,3.8
+200,The Good Bowl - Mumbai,Mumbai,Snacks,4.0
+201,Naturals Ice Cream - Pune,Pune,Japanese,4.9
+202,Haldiram's - Chennai,Chennai,Japanese,4.1
+203,Chai Point - Pune,Pune,North Indian,3.9
+204,Box8 - Mumbai,Mumbai,Rolls,4.8
+205,Burger King - Hyderabad,Hyderabad,Rolls,3.6
+206,Social - Bangalore,Bangalore,Beverages,4.9
+207,Subway - Chennai,Chennai,Pizza,4.5
+208,A2B - Hyderabad,Hyderabad,Chinese,3.6
+209,Burger Barn - Bangalore,Bangalore,Mughlai,4.2
+210,KFC - Ahmedabad,Ahmedabad,South Indian,3.5
+211,Spice Box - Hyderabad,Hyderabad,Desserts,4.9
+212,Tea Villa - Mumbai,Mumbai,South Indian,4.3
+213,Box8 - Bangalore,Bangalore,Snacks,4.8
+214,Fresh Menu - Bangalore,Bangalore,Beverages,4.5
+215,Naturals Ice Cream - Bangalore,Bangalore,Italian,3.9
+216,Rolls & Wraps - Delhi,Delhi,Street Food,4.5
+217,Naturals Ice Cream - Mumbai,Mumbai,Street Food,4.4
+218,Anjappar - Kolkata,Kolkata,Beverages,4.1
+219,Paradise Biryani - Mumbai,Mumbai,Snacks,4.6
+220,Noodle Nook - Hyderabad,Hyderabad,Rolls,3.6
+221,Noodle Nook - Bangalore,Bangalore,American,3.6
+222,Box8 - Bangalore,Bangalore,Rolls,4.1
+223,Punjabi Tadka - Bangalore,Bangalore,Biryani,4.9
+224,Nandos - Delhi,Delhi,Snacks,3.7
+225,Empire - Pune,Pune,Italian,4.0
+226,Oven Story - Pune,Pune,American,4.7
+227,A2B - Delhi,Delhi,Street Food,4.3
+228,Tea Villa - Hyderabad,Hyderabad,North Indian,4.2
+229,Ammi's Biryani - Bangalore,Bangalore,Chinese,3.8
+230,Punjabi Tadka - Hyderabad,Hyderabad,Beverages,3.5
+231,Cafe Mocha - Ahmedabad,Ahmedabad,Italian,4.1
+232,Biryani By Kilo - Kolkata,Kolkata,Italian,4.7
+233,Noodle Nook - Bangalore,Bangalore,Rolls,4.7
+234,Tea Villa - Delhi,Delhi,Street Food,4.3
+235,Biryani Blues - Mumbai,Mumbai,South Indian,4.4
+236,Theobroma - Mumbai,Mumbai,Continental,3.8
+237,Burger Barn - Pune,Pune,Desserts,4.0
+238,Burger Barn - Chennai,Chennai,Pizza,3.6
+239,Box8 - Bangalore,Bangalore,Pizza,3.6
+240,Oven Story - Bangalore,Bangalore,Pizza,3.9
+241,Anjappar - Ahmedabad,Ahmedabad,Continental,3.7
+242,Punjabi Tadka - Pune,Pune,Desserts,4.8
+243,Rolls Mania - Bangalore,Bangalore,Italian,4.7
+244,Spice Box - Bangalore,Bangalore,Rolls,4.7
+245,Social - Mumbai,Mumbai,Burgers,3.6
+246,Naturals Ice Cream - Pune,Pune,American,4.1
+247,Naturals Ice Cream - Bangalore,Bangalore,Beverages,4.9
+248,Cafe Mocha - Mumbai,Mumbai,Continental,4.8
+249,Wow Momo - Hyderabad,Hyderabad,Chinese,3.9
+250,Naturals Ice Cream - Bangalore,Bangalore,Snacks,3.9
+251,Rolls & Wraps - Chennai,Chennai,Desserts,4.7
+252,Wow Momo - Delhi,Delhi,South Indian,4.3
+253,Dosa Express - Delhi,Delhi,Burgers,4.1
+254,Fresh Menu - Hyderabad,Hyderabad,Street Food,4.0
+255,Biryani By Kilo - Bangalore,Bangalore,North Indian,3.7
+256,Tea Villa - Delhi,Delhi,American,4.7
+257,Dosa Express - Bangalore,Bangalore,Desserts,3.9
+258,Empire - Delhi,Delhi,Rolls,4.4
+259,Box8 - Mumbai,Mumbai,American,3.8
+260,Chole Bhature Hub - Chennai,Chennai,Street Food,4.7
+261,Pav Bhaji King - Delhi,Delhi,North Indian,3.5
+262,Idli House - Bangalore,Bangalore,Snacks,4.1
+263,Subway - Pune,Pune,Snacks,3.9
+264,Pind Balluchi - Mumbai,Mumbai,Pizza,4.6
+265,Chole Bhature Hub - Bangalore,Bangalore,North Indian,3.8
+266,Pizza Palace - Chennai,Chennai,Japanese,4.7
+267,Oven Story - Delhi,Delhi,Continental,4.4
+268,Naturals Ice Cream - Pune,Pune,Japanese,3.6
+269,Saravana Bhavan - Delhi,Delhi,Snacks,4.1
+270,Idli House - Bangalore,Bangalore,Continental,4.5
+271,Theobroma - Ahmedabad,Ahmedabad,Snacks,3.5
+272,Theobroma - Hyderabad,Hyderabad,Japanese,3.9
+273,Subway - Bangalore,Bangalore,North Indian,3.6
+274,Truffles - Delhi,Delhi,Burgers,4.7
+275,A2B - Hyderabad,Hyderabad,Desserts,3.6
+276,Subway - Delhi,Delhi,Snacks,3.8
+277,Burger Barn - Delhi,Delhi,Burgers,4.3
+278,Nandos - Bangalore,Bangalore,Burgers,4.7
+279,Idli House - Delhi,Delhi,Biryani,4.1
+280,Naturals Ice Cream - Bangalore,Bangalore,Desserts,4.5
+281,Social - Mumbai,Mumbai,Mughlai,4.2
+282,Biryani By Kilo - Kolkata,Kolkata,Beverages,4.8
+283,Truffles - Hyderabad,Hyderabad,Continental,4.7
+284,Empire - Chennai,Chennai,Burgers,4.7
+285,Cafe Mocha - Hyderabad,Hyderabad,Biryani,4.6
+286,Paradise Biryani - Hyderabad,Hyderabad,Desserts,4.5
+287,Chole Bhature Hub - Hyderabad,Hyderabad,Continental,3.7
+288,Paradise Biryani - Hyderabad,Hyderabad,Italian,4.6
+289,Punjabi Tadka - Mumbai,Mumbai,Japanese,4.3
+290,Pizza Palace - Mumbai,Mumbai,Street Food,4.0
+291,Paradise Biryani - Bangalore,Bangalore,South Indian,4.6
+292,Domino's - Delhi,Delhi,Mughlai,3.7
+293,Mainland China - Delhi,Delhi,Beverages,4.6
+294,Saravana Bhavan - Bangalore,Bangalore,Street Food,4.8
+295,Leon's - Kolkata,Kolkata,Italian,4.5
+296,Theobroma - Pune,Pune,Italian,4.9
+297,Pind Balluchi - Hyderabad,Hyderabad,Italian,4.7
+298,Dosa Express - Delhi,Delhi,American,4.4
+299,Oven Story - Kolkata,Kolkata,American,4.5
+300,Truffles - Delhi,Delhi,Snacks,4.5

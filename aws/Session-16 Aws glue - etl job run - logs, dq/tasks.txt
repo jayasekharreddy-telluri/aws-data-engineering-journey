@@ -1,0 +1,474 @@
+# AWS Glue Day 1 + Day 2 — Final Practical Tasks List
+
+---
+
+# Full Practical Flow
+
+```text id="1t4o6z"
+Upload CSV to S3
+    ↓
+Create Glue Crawler
+    ↓
+Create Bronze Tables
+    ↓
+Query Bronze in Athena
+    ↓
+Create Glue ETL Job
+    ↓
+Apply Data Quality Rules
+    ↓
+Clean + Transform Data
+    ↓
+Write Silver Parquet
+    ↓
+Create Silver Crawler
+    ↓
+Query Silver Data in Athena
+```
+
+---
+
+# Task 1 — Create S3 Bucket Structure
+
+## What We Did
+
+Created bucket:
+
+```text id="f9k2ms"
+swiggy-de-course-jk-20260520
+```
+
+Created folders:
+
+```text id="1w5l7a"
+customers/
+restaurants/
+orders/
+order_items/
+athena-results/
+```
+
+Purpose:
+
+```text id="6h8t3y"
+Store raw CSV + Athena results
+```
+
+---
+
+# Task 2 — Upload Raw CSV Files
+
+## What We Did
+
+Uploaded:
+
+```text id="n4r7qp"
+customers.csv
+restaurants.csv
+orders.csv
+order_items.csv
+```
+
+into corresponding S3 folders.
+
+---
+
+# Task 3 — Create Glue Database
+
+## What We Did
+
+Created database:
+
+```text id="e7v2mx"
+swiggy_raw_db
+```
+
+Purpose:
+
+```text id="3x8jlb"
+Store Bronze metadata tables
+```
+
+---
+
+# Task 4 — Create IAM Role + Permissions
+
+## What We Did
+
+Created role:
+
+```text id="z8c4pr"
+GlueCourseRole
+```
+
+Attached:
+
+```text id="4s2kqj"
+AWSGlueServiceRole
+Custom S3 Access Policy
+```
+
+Important permissions:
+
+```json id="x5v9ne"
+s3:GetObject
+s3:PutObject
+s3:ListBucket
+```
+
+---
+
+# Task 5 — Create Bronze Crawler
+
+## What We Did
+
+Crawler:
+
+```text id="o9d3wh"
+swiggy-raw-crawler
+```
+
+Target:
+
+```text id="k2m8fv"
+s3://swiggy-de-course-jk-20260520/
+```
+
+Excluded path:
+
+```text id="6b1rxt"
+athena-results/**
+```
+
+Database:
+
+```text id="j4q7py"
+swiggy_raw_db
+```
+
+---
+
+# Task 6 — Run Bronze Crawler
+
+## Result
+
+Crawler created tables:
+
+```text id="t8z5cu"
+customers
+restaurants
+orders
+order_items
+```
+
+Learned:
+
+```text id="9x3nkd"
+Crawler creates metadata only
+```
+
+---
+
+# Task 7 — Debug Crawler Permission Errors
+
+## Error Faced
+
+```text id="2c7yqm"
+403 AccessDenied
+```
+
+Reason:
+
+```text id="w1m5pz"
+Glue role had no S3 access
+```
+
+Fix:
+
+```text id="5f9kvl"
+Added S3 permissions to Glue role
+```
+
+---
+
+# Task 8 — Query Bronze Data in Athena
+
+## What We Did
+
+Configured Athena output location:
+
+```text id="3v8qjr"
+s3://swiggy-de-course-jk-20260520/athena-results/
+```
+
+Ran SQL queries on Bronze tables.
+
+Purpose:
+
+```text id="7k4mxe"
+Validate raw data
+```
+
+---
+
+# Task 9 — Create Glue ETL Job
+
+## What We Did
+
+Created PySpark Glue Job:
+
+```text id="y6p2bt"
+swiggy-bronze-to-silver
+```
+
+Runtime:
+
+```text id="2q9wcf"
+Glue 4.0
+Spark 3
+Python 3
+```
+
+---
+
+# Task 10 — Read Bronze Tables in Glue ETL
+
+## What We Did
+
+Used:
+
+```python id="6x4mzn"
+create_dynamic_frame.from_catalog()
+```
+
+Concept:
+
+```text id="v5r8qa"
+Read using Glue Catalog metadata
+```
+
+---
+
+# Task 11 — Apply Data Quality Rules
+
+## What We Did
+
+Used:
+
+```text id="8n1jws"
+EvaluateDataQuality
+```
+
+Rules added:
+
+* completeness
+* uniqueness
+* positive amounts
+* valid dates
+* valid status
+
+Purpose:
+
+```text id="1m4zku"
+Validate dirty raw data automatically
+```
+
+---
+
+# Task 12 — Clean Orders Data
+
+## What We Did
+
+Removed:
+
+* NULL customer_id
+* duplicates
+* negative amounts
+* invalid dates
+
+Fixed:
+
+```text id="p7y2vr"
+delivery_time = 0 → NULL
+```
+
+---
+
+# Task 13 — Convert Data Types
+
+## What We Did
+
+Converted:
+
+```text id="4b6xjt"
+STRING → DATE
+```
+
+using:
+
+```python id="5q9kew"
+to_date()
+```
+
+---
+
+# Task 14 — Join Orders with Restaurants
+
+## What We Did
+
+Joined:
+
+```text id="7d2ncf"
+orders + restaurants
+```
+
+Purpose:
+
+```text id="3r8zml"
+Add city column for partitioning
+```
+
+---
+
+# Task 15 — Convert DynamicFrame ↔ DataFrame
+
+## Main Learning
+
+```text id="8v6tjq"
+READ  → DynamicFrame
+WORK  → DataFrame
+WRITE → DynamicFrame
+```
+
+---
+
+# Task 16 — Write Silver Layer in Parquet
+
+## What We Did
+
+Wrote cleaned data into:
+
+```text id="4m1qzs"
+silver/
+```
+
+Format:
+
+```text id="9j5xkr"
+Parquet
+```
+
+Purpose:
+
+* faster Athena queries
+* lower scan cost
+
+---
+
+# Task 17 — Partition Orders Table
+
+## What We Did
+
+Partitioned by:
+
+```text id="1z7vpo"
+city
+```
+
+Generated:
+
+```text id="6w3nfb"
+city=Hyderabad/
+city=Bangalore/
+```
+
+Purpose:
+
+```text id="2x8qdm"
+Reduce Athena scan cost
+```
+
+---
+
+# Task 18 — Create Silver Database + Crawler
+
+## What We Did
+
+Database:
+
+```text id="5t1rke"
+swiggy_silver_db
+```
+
+Crawler:
+
+```text id="8f4jvl"
+swiggy-silver-crawl
+```
+
+Target:
+
+```text id="4q7ncy"
+s3://swiggy-de-course-jk-20260520/silver/
+```
+
+---
+
+# Task 19 — Query Silver Data in Athena
+
+## What We Did
+
+Validated:
+
+* cleaned data
+* partitioning
+* Parquet performance
+* removed duplicates
+
+---
+
+# Task 20 — Debug Glue Production Errors
+
+## Errors Learned
+
+### AccessDenied
+
+```text id="3m9vkt"
+IAM/S3 permission issue
+```
+
+---
+
+### RESOURCE_NOT_FOUND
+
+```text id="7y5qbx"
+Metadata exists
+but actual file inaccessible/missing
+```
+
+---
+
+# Final Architecture Understanding
+
+```text id="1n8qwr"
+S3 = storage
+
+Crawler = schema discovery
+
+Glue Catalog = metadata
+
+Glue ETL = transformation
+
+Athena = analytics
+
+Parquet = optimized format
+```
+
+---
+
+# Final Memory Line
+
+```text id="4p6xzn"
+We built a complete AWS analytics pipeline:
+Raw CSV → Bronze → Glue ETL → Silver Parquet → Athena Analytics
+```

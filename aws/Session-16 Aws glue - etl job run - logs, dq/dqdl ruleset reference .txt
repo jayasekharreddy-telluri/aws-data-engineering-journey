@@ -1,0 +1,210 @@
+═══════════════════════════════════════════════════════════════════════════════
+  DQDL RULESET REFERENCE
+  Glue Data Quality Definition Language  ·  Day 2  ·  Keystone Edtech
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT IS DQDL?
+─────────────
+Data Quality Definition Language. AWS-native rule syntax for declaring
+checks against your data. Looks like a domain-specific config block.
+Lives inside Glue ETL jobs, runs on Spark, results stream to CloudWatch
+and to a Glue Data Quality results dataset you can query.
+
+A ruleset is just:
+
+    Rules = [
+        rule_1,
+        rule_2,
+        ...
+    ]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  CORE RULE TYPES (the 8 you'll use 95% of the time)
+═══════════════════════════════════════════════════════════════════════════════
+
+1.  RowCount
+    ─────────
+    Asserts row count is in a range.
+
+        RowCount > 15000
+        RowCount between 14000 and 16000
+        RowCount = 15026
+
+2.  Completeness  "<column>"
+    ────────────────────────
+    Asserts the % of non-null rows in a column.
+
+        Completeness "customer_id" >= 1.0       # zero nulls allowed
+        Completeness "delivery_time" > 0.7      # at least 70% non-null
+
+3.  IsComplete  "<column>"
+    ─────────────────────
+    Shorthand for Completeness >= 1.0  (zero nulls allowed).
+
+        IsComplete "order_id"
+
+4.  Uniqueness  "<column>"
+    ─────────────────────
+    Asserts the % of unique values in a column.
+
+        Uniqueness "order_id" >= 1.0           # all values must be unique
+        Uniqueness "customer_id" > 0.1         # at least 10% must be distinct
+
+5.  IsUnique  "<column>"
+    ───────────────────
+    Shorthand for Uniqueness >= 1.0 (every value distinct).
+
+        IsUnique "order_id"
+
+6.  ColumnValues  "<column>"  <expression>
+    ───────────────────────────────────────
+    Asserts every value matches a predicate.
+
+        ColumnValues "total_amount" > 0
+        ColumnValues "order_date" between "2024-01-01" and "2024-12-31"
+        ColumnValues "status" in ["Delivered", "Cancelled", "Pending"]
+        ColumnValues "rating" between 0.0 and 5.0
+        ColumnValues "email" matches "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$"
+
+7.  ColumnLength  "<column>"  <range>
+    ────────────────────────────────
+    Asserts string length is in range.
+
+        ColumnLength "name" between 2 and 100
+        ColumnLength "phone" = 10
+
+8.  ColumnDataType  "<column>"  =  "<type>"
+    ────────────────────────────────────
+    Asserts the column type matches what you expect.
+
+        ColumnDataType "total_amount" = "Double"
+        ColumnDataType "order_date" = "Date"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  ADVANCED RULE TYPES (for when the basics aren't enough)
+═══════════════════════════════════════════════════════════════════════════════
+
+ColumnExists  "<column>"
+    Asserts a column is present in the dataset.
+        ColumnExists "delivery_time"
+
+ColumnCount = N
+    Asserts the table has exactly N columns.
+        ColumnCount = 7
+
+DatasetMatch  "<other_dataset>"  "<key>"  >=  threshold
+    Asserts the join completeness against another dataset.
+        DatasetMatch "restaurants" "restaurant_id" >= 0.99
+
+ReferentialIntegrity  "(<col1>,<col2>)"  "<other>.(<col1>,<col2>)"  >=  threshold
+    Asserts foreign-key integrity.
+        ReferentialIntegrity "(restaurant_id)" "restaurants.(restaurant_id)" >= 1.0
+
+CustomSql "SELECT ..."  <expression>
+    Runs a custom Spark SQL query and asserts on the scalar result.
+    Reference the dataset as `primary` in the query.
+        CustomSql "SELECT COUNT(*) FROM primary WHERE total_amount > 10000" < 100
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  THE  RULESET  WE'RE  USING  ON  DAY 2
+═══════════════════════════════════════════════════════════════════════════════
+
+Run against the RAW orders table to flag the dirty records we know exist.
+
+    Rules = [
+        RowCount > 15000,
+        Completeness "customer_id" >= 1.0,
+        ColumnValues "total_amount" > 0,
+        ColumnValues "order_date" between "2024-01-01" and "2024-12-31",
+        Uniqueness "order_id" >= 1.0,
+        ColumnValues "status" in ["Delivered", "Cancelled", "Pending"],
+        ColumnLength "status" between 6 and 10
+    ]
+
+EXPECTED OUTCOMES
+─────────────────
+  ✓  RowCount > 15000                              PASS  (15,026 rows)
+  ✗  Completeness "customer_id" >= 1.0             FAIL  (~39 nulls)
+  ✗  ColumnValues "total_amount" > 0               FAIL  (~26 negatives)
+  ✗  ColumnValues "order_date" between ...         FAIL  (~25 future dates)
+  ✗  Uniqueness "order_id" >= 1.0                  FAIL  (~26 duplicates)
+  ✓  ColumnValues "status" in [...]                PASS
+  ✓  ColumnLength "status" between 6 and 10        PASS
+
+5 of 7 rules fail.  This is the teaching moment — students see DQDL surface
+real issues that a crawler alone could never catch.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  HOW TO USE A RULESET INSIDE A GLUE JOB  (PySpark)
+═══════════════════════════════════════════════════════════════════════════════
+
+    from awsgluedq.transforms import EvaluateDataQuality
+
+    ruleset = """
+    Rules = [
+        RowCount > 1000,
+        IsComplete "id"
+    ]
+    """
+
+    EvaluateDataQuality.apply(
+        frame=my_dynamic_frame,
+        ruleset=ruleset,
+        publishing_options={
+            "dataQualityEvaluationContext": "DQ_my_dataset",
+            "enableDataQualityCloudWatchMetrics": True,
+            "enableDataQualityResultsPublishing": True,
+            "resultsS3Prefix": "s3://your-bucket/dq-results/"
+        }
+    )
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  HOW TO USE A RULESET IN GLUE STUDIO  (visual editor)
+═══════════════════════════════════════════════════════════════════════════════
+
+  1.  Add an "Evaluate Data Quality" transform node after your source.
+  2.  In the right-hand panel, paste the ruleset into the Ruleset editor.
+  3.  Choose what to do on rule failure:
+        • Continue (default) — log result, keep going
+        • Fail job — stop the job entirely if any rule fails
+  4.  Output settings:
+        • Original data        → passes through unchanged (for downstream steps)
+        • Rule outcomes         → a dataset of rule_name + status + threshold
+        • Row-level outcomes    → flags each row with which rule it violated
+                                  (use this to quarantine dirty rows!)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  WHERE TO SEE THE RESULTS
+═══════════════════════════════════════════════════════════════════════════════
+
+  After the job runs:
+
+  • Glue Console → Data quality tab on the job run page
+       Shows pass/fail status for each rule, side-by-side.
+
+  • CloudWatch Metrics → Glue Data Quality namespace
+       One metric per rule. Wire alarms to alert on failure.
+
+  • S3 results bucket (resultsS3Prefix you provided)
+       JSON files with full rule evaluation history. Catalog this and
+       query it from Athena for trends over time.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  RULES OF THUMB FROM PRODUCTION
+═══════════════════════════════════════════════════════════════════════════════
+
+  • Start with 5–7 rules per critical table. More than 15 = noise.
+  • Always include: RowCount, IsComplete on PKs, IsUnique on PKs.
+  • For monetary columns: ColumnValues > 0 catches sign-flip bugs.
+  • For date columns: bound range to ±1 year of today's date.
+  • Never make rules so strict they fail on every run — alert fatigue.
+  • Quarantine dirty rows for inspection. Don't silently drop them.
+
+═══════════════════════════════════════════════════════════════════════════════

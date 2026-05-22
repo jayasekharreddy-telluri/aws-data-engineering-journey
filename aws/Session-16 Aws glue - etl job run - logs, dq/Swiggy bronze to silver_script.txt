@@ -1,0 +1,254 @@
+"""
+═══════════════════════════════════════════════════════════════════════════════
+  BRONZE  →  SILVER  ETL  JOB
+  AWS Glue PySpark Script  ·  Keystone Edtech  ·  Day 2
+═══════════════════════════════════════════════════════════════════════════════
+
+  WHAT THIS SCRIPT DOES
+  ─────────────────────
+  Reads the 4 raw Swiggy tables from the Glue Catalog (swiggy_raw_db),
+  applies data quality rules, cleans the data, and writes cleaned Parquet
+  files to a silver S3 prefix — partitioned for efficient querying.
+
+  INPUT
+  ─────
+  Database:  swiggy_raw_db        (CSV, populated by Day 1 crawler)
+  Tables:    customers, restaurants, orders, order_items
+
+  OUTPUT
+  ──────
+  S3 path:   s3://<your-bucket>/silver/
+             ├── customers/                       (Parquet, no partition)
+             ├── restaurants/                     (Parquet, no partition)
+             ├── orders/city=Bangalore/...        (Parquet, partitioned by city)
+             └── order_items/                     (Parquet, no partition)
+
+  JOB PARAMETERS (set in Glue Studio Job details tab)
+  ───────────────────────────────────────────────────
+  --source_db      swiggy_raw_db
+  --target_path    s3://<your-bucket>/silver
+
+  DATA QUALITY RULES
+  ──────────────────
+  Embedded as DQDL ruleset against orders (the dirtiest table).
+  See the EvaluateDataQuality block below for full ruleset.
+
+═══════════════════════════════════════════════════════════════════════════════
+"""
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from pyspark.sql.functions import col, to_date, when, lit, trim
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
+from awsgluedq.transforms import EvaluateDataQuality
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GLUE BOILERPLATE  —  do not modify
+# ──────────────────────────────────────────────────────────────────────────────
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'source_db', 'target_path'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+SOURCE_DB    = args['source_db']      # swiggy_raw_db
+TARGET_PATH  = args['target_path']    # s3://<bucket>/silver
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 1 — READ RAW TABLES FROM CATALOG
+# ──────────────────────────────────────────────────────────────────────────────
+print(f"[INFO] Reading from database: {SOURCE_DB}")
+
+customers_dyf  = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='customers',
+    transformation_ctx='customers_source'
+)
+restaurants_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='restaurants',
+    transformation_ctx='restaurants_source'
+)
+orders_dyf     = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='orders',
+    transformation_ctx='orders_source'
+)
+order_items_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='order_items',
+    transformation_ctx='order_items_source'
+)
+
+print(f"[INFO] Raw row counts — "
+      f"customers={customers_dyf.count()}, "
+      f"restaurants={restaurants_dyf.count()}, "
+      f"orders={orders_dyf.count()}, "
+      f"order_items={order_items_dyf.count()}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 2 — DATA QUALITY EVALUATION (orders — the dirtiest table)
+#  ─────────────────────────────────────────────────────────────
+#  Runs a DQDL ruleset against raw orders. Results are pushed to
+#  CloudWatch and to a Glue DQ results table — we can inspect either.
+# ──────────────────────────────────────────────────────────────────────────────
+DQDL_RULES_ORDERS = """
+Rules = [
+    RowCount > 15000,
+    Completeness "customer_id" >= 1.0,
+    ColumnValues "total_amount" > 0,
+    ColumnValues "order_date" between "2024-01-01" and "2024-12-31",
+    Uniqueness "order_id" >= 1.0,
+    ColumnValues "status" in ["Delivered", "Cancelled", "Pending"],
+    ColumnLength "status" between 6 and 10
+]
+"""
+
+print("[INFO] Running DQDL ruleset against raw orders...")
+dq_results = EvaluateDataQuality.apply(
+    frame=orders_dyf,
+    ruleset=DQDL_RULES_ORDERS,
+    publishing_options={
+        "dataQualityEvaluationContext": "DQ_orders_bronze",
+        "enableDataQualityCloudWatchMetrics": True,
+        "enableDataQualityResultsPublishing": True,
+        "resultsS3Prefix": f"{TARGET_PATH}/dq-results/orders/"
+    }
+)
+print("[INFO] DQDL evaluation complete — see CloudWatch + Glue Data Quality tab.")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 3 — CLEAN  ORDERS
+#  ────────────────────────
+#  We drop or fix every dirty record we know exists:
+#    • blank customer_id   → drop
+#    • negative amount      → drop
+#    • future order_date    → drop
+#    • duplicate order_id   → keep first
+#    • zero delivery_time on Delivered → set to NULL
+#    • cast order_date STRING → DATE
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Cleaning orders...")
+orders_df = orders_dyf.toDF()
+
+orders_clean_df = (
+    orders_df
+    # remove blank / null customer_id
+    .filter(col("customer_id").isNotNull())
+    .filter(trim(col("customer_id").cast("string")) != "")
+    # remove negative amounts
+    .filter(col("total_amount") > 0)
+    # remove future dates  (compare as string — works because of ISO format)
+    .filter(col("order_date") <= "2024-12-31")
+    .filter(col("order_date") >= "2024-01-01")
+    # cast order_date to a real DATE
+    .withColumn("order_date", to_date(col("order_date"), "yyyy-MM-dd"))
+    # null out invalid delivery_time on Delivered orders
+    .withColumn(
+        "delivery_time",
+        when(
+            (col("status") == "Delivered") & (col("delivery_time") == 0),
+            lit(None)
+        ).otherwise(col("delivery_time"))
+    )
+    # dedupe by order_id (keep one row per order)
+    .dropDuplicates(["order_id"])
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 4 — ENRICH ORDERS WITH CITY  (so we can partition by city on write)
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Enriching orders with city from restaurants...")
+restaurants_df = restaurants_dyf.toDF().select("restaurant_id", "city")
+
+orders_enriched_df = orders_clean_df.join(
+    restaurants_df,
+    on="restaurant_id",
+    how="left"
+)
+
+print(f"[INFO] Cleaned orders row count: {orders_enriched_df.count()}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 5 — CLEAN  CUSTOMERS / RESTAURANTS / ORDER_ITEMS
+#  Lighter cleaning — these tables don't have injected dirt, just type fixes.
+# ──────────────────────────────────────────────────────────────────────────────
+customers_clean_df = (
+    customers_dyf.toDF()
+    .withColumn("joined_date", to_date(col("joined_date"), "yyyy-MM-dd"))
+)
+
+restaurants_clean_df = (
+    restaurants_dyf.toDF()
+    # rating is already a double; just drop any negative-rated rows defensively
+    .filter(col("rating") > 0)
+)
+
+order_items_clean_df = (
+    order_items_dyf.toDF()
+    .filter(col("quantity") > 0)
+    .filter(col("unit_price") > 0)
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 6 — WRITE  SILVER  PARQUET
+# ──────────────────────────────────────────────────────────────────────────────
+print(f"[INFO] Writing silver layer to {TARGET_PATH}")
+
+# orders — partitioned by city
+orders_silver_dyf = DynamicFrame.fromDF(
+    orders_enriched_df, glueContext, "orders_silver"
+)
+glueContext.write_dynamic_frame.from_options(
+    frame=orders_silver_dyf,
+    connection_type="s3",
+    connection_options={
+        "path": f"{TARGET_PATH}/orders/",
+        "partitionKeys": ["city"]
+    },
+    format="parquet",
+    transformation_ctx="orders_silver_write"
+)
+
+# customers — no partitioning (small, low-cardinality)
+customers_silver_dyf = DynamicFrame.fromDF(
+    customers_clean_df, glueContext, "customers_silver"
+)
+glueContext.write_dynamic_frame.from_options(
+    frame=customers_silver_dyf,
+    connection_type="s3",
+    connection_options={"path": f"{TARGET_PATH}/customers/"},
+    format="parquet",
+    transformation_ctx="customers_silver_write"
+)
+
+# restaurants — no partitioning
+restaurants_silver_dyf = DynamicFrame.fromDF(
+    restaurants_clean_df, glueContext, "restaurants_silver"
+)
+glueContext.write_dynamic_frame.from_options(
+    frame=restaurants_silver_dyf,
+    connection_type="s3",
+    connection_options={"path": f"{TARGET_PATH}/restaurants/"},
+    format="parquet",
+    transformation_ctx="restaurants_silver_write"
+)
+
+# order_items — no partitioning
+order_items_silver_dyf = DynamicFrame.fromDF(
+    order_items_clean_df, glueContext, "order_items_silver"
+)
+glueContext.write_dynamic_frame.from_options(
+    frame=order_items_silver_dyf,
+    connection_type="s3",
+    connection_options={"path": f"{TARGET_PATH}/order_items/"},
+    format="parquet",
+    transformation_ctx="order_items_silver_write"
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  COMMIT
+# ──────────────────────────────────────────────────────────────────────────────
+job.commit()
+print("[INFO] Job complete. Silver layer ready for Day 3 aggregation.")
