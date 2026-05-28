@@ -1,0 +1,117 @@
+-- ═══════════════════════════════════════════════════════════════════════════════
+--   CUSTOMER FEEDBACK — POSTGRES SEED SCRIPT
+--   AWS DE Course · Day 3.5 · Keystone Edtech
+-- ═══════════════════════════════════════════════════════════════════════════════
+--
+--   Run this AFTER your RDS Postgres instance is up and you can connect via psql:
+--     psql -h <rds-endpoint> -U postgres -d postgres -f customer_feedback_seed.sql
+--
+--   What this creates:
+--     • Database:       swiggy_external
+--     • Table:           customer_feedback (50 rows of realistic feedback)
+--     • Schema:          public (default)
+--
+--   Why this dataset:
+--     Marketing team has been collecting Swiggy customer feedback in their own
+--     Postgres database. Day 3.5 brings this into our pipeline as a 5th source —
+--     joining the existing 4 silver tables.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ── 1. Create the database (run from default postgres database first) ────────
+DROP DATABASE IF EXISTS swiggy_external;
+CREATE DATABASE swiggy_external;
+
+-- ── 2. Connect into it and create the table ──────────────────────────────────
+\c swiggy_external
+
+DROP TABLE IF EXISTS customer_feedback;
+
+CREATE TABLE customer_feedback (
+    feedback_id      SERIAL PRIMARY KEY,
+    customer_id      INTEGER NOT NULL,
+    order_id         INTEGER,
+    rating           INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    feedback_text    TEXT,
+    sentiment        VARCHAR(20),               -- positive / neutral / negative
+    feedback_date    DATE NOT NULL,
+    response_status  VARCHAR(20) DEFAULT 'pending',  -- pending / responded / closed
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_feedback_customer ON customer_feedback(customer_id);
+CREATE INDEX idx_feedback_date     ON customer_feedback(feedback_date);
+
+-- ── 3. Insert 50 rows of realistic feedback ─────────────────────────────────
+INSERT INTO customer_feedback
+    (customer_id, order_id, rating, feedback_text, sentiment, feedback_date, response_status) VALUES
+-- Positive feedback (rating 4-5)
+(1023, 10001, 5, 'Excellent biryani, arrived hot and fresh. Will order again!',          'positive', '2024-11-15', 'closed'),
+(1145, 10042, 5, 'Best dosa in Bangalore. Crispy and flavorful.',                          'positive', '2024-11-15', 'closed'),
+(1203, 10078, 4, 'Good portion size for the price. Delivery was on time.',                 'positive', '2024-11-16', 'responded'),
+(1023, 10112, 5, 'Loved the new chicken tikka. Marketing should highlight this.',          'positive', '2024-11-16', 'closed'),
+(1456, 10134, 4, 'Quick delivery, food was warm.',                                          'positive', '2024-11-17', 'closed'),
+(1567, 10156, 5, 'Outstanding service. Driver was very polite.',                            'positive', '2024-11-17', 'closed'),
+(1234, 10189, 5, 'Veg thali was authentic and tasty.',                                       'positive', '2024-11-18', 'responded'),
+(1389, 10212, 4, 'Good Mughlai cuisine. Could be slightly less oily.',                      'positive', '2024-11-18', 'pending'),
+(1789, 10245, 5, 'Hyderabadi biryani at its best. 10/10.',                                  'positive', '2024-11-19', 'closed'),
+(1023, 10267, 4, 'Solid choice for family dinner. Kids loved the noodles.',                'positive', '2024-11-19', 'closed'),
+-- Neutral feedback (rating 3)
+(1145, 10298, 3, 'Food was OK. Nothing special, nothing bad.',                              'neutral',  '2024-11-20', 'pending'),
+(1203, 10321, 3, 'Average. Expected better for the price.',                                 'neutral',  '2024-11-20', 'pending'),
+(1456, 10345, 3, 'Decent meal. Delivery took longer than promised but food was fine.',      'neutral',  '2024-11-21', 'responded'),
+(1567, 10367, 3, 'Quantity was less than expected.',                                         'neutral',  '2024-11-21', 'pending'),
+(1234, 10389, 3, 'Tastes like every other biryani place. No standout.',                     'neutral',  '2024-11-22', 'pending'),
+(1389, 10412, 3, 'Average. Order again maybe.',                                              'neutral',  '2024-11-22', 'closed'),
+(1789, 10434, 3, 'Food was good but packaging leaked. 3 stars.',                            'neutral',  '2024-11-23', 'responded'),
+(1023, 10456, 3, 'Standard quality.',                                                        'neutral',  '2024-11-23', 'pending'),
+-- Negative feedback (rating 1-2)
+(1145, 10489, 1, 'Cold food. Driver was rude. Would not order again.',                      'negative', '2024-11-24', 'responded'),
+(1203, 10512, 2, 'Wrong order delivered. No refund yet despite 3 calls.',                   'negative', '2024-11-24', 'pending'),
+(1456, 10534, 1, 'Food was inedible. Burned and over-spiced.',                               'negative', '2024-11-25', 'responded'),
+(1567, 10556, 2, 'Delivery 45 min late. Food cold by then.',                                'negative', '2024-11-25', 'pending'),
+(1234, 10589, 1, 'Found a hair in my food. Disgusting.',                                    'negative', '2024-11-26', 'responded'),
+(1389, 10612, 2, 'Not what I ordered. Customer service unhelpful.',                         'negative', '2024-11-26', 'pending'),
+(1789, 10634, 2, 'Quality has dropped. Used to be much better 6 months ago.',              'negative', '2024-11-27', 'pending'),
+(1023, 10656, 1, 'Cancelled my order without notice.',                                       'negative', '2024-11-27', 'closed'),
+(1145, 10689, 2, 'Stale food. Returned for refund — process took 2 weeks.',                'negative', '2024-11-28', 'closed'),
+-- More positive (varied dates and customers)
+(2034, 10712, 5, 'Discovered this restaurant via Swiggy — now my favorite.',                'positive', '2024-11-28', 'closed'),
+(2145, 10734, 5, 'Authentic Bengali fish curry. Reminds me of Kolkata.',                    'positive', '2024-11-29', 'closed'),
+(2203, 10756, 4, 'Good Chinese food. Better than most places in the area.',                'positive', '2024-11-29', 'closed'),
+(2389, 10789, 5, 'Pizza was crispy and loaded with toppings.',                               'positive', '2024-11-30', 'closed'),
+(2456, 10812, 4, 'Tandoori platter was generous and well-spiced.',                           'positive', '2024-11-30', 'responded'),
+(2567, 10834, 5, 'Best South Indian breakfast option in the city.',                          'positive', '2024-12-01', 'closed'),
+-- More neutral
+(2034, 10856, 3, 'Decent but the menu has gotten smaller over time.',                       'neutral',  '2024-12-01', 'pending'),
+(2145, 10889, 3, 'Food was fine. Price went up recently.',                                  'neutral',  '2024-12-02', 'pending'),
+(2203, 10912, 3, 'Average experience. Would order again if no better options.',              'neutral',  '2024-12-02', 'pending'),
+-- More negative
+(2389, 10934, 1, 'Order completely wrong. Lost confidence in this restaurant.',              'negative', '2024-12-03', 'responded'),
+(2456, 10956, 2, 'Quality control issues. Saw plastic in the curry.',                        'negative', '2024-12-03', 'responded'),
+(2567, 10989, 2, 'Took 1.5 hours. Refund denied.',                                            'negative', '2024-12-04', 'pending'),
+-- Recent feedback
+(1023, 11012, 5, 'Continues to be excellent. Loyal customer for 2 years now.',              'positive', '2024-12-05', 'closed'),
+(1456, 11034, 4, 'Improved a lot from last year. Worth giving another chance.',             'positive', '2024-12-05', 'closed'),
+(1789, 11056, 1, 'Listed as available, then cancelled after 30 min wait. Not acceptable.',  'negative', '2024-12-06', 'responded'),
+(2034, 11089, 3, 'OK food. Service has slipped lately.',                                    'neutral',  '2024-12-06', 'pending'),
+(2389, 11112, 5, 'Birthday delivery on time and beautifully packed. Made my day.',          'positive', '2024-12-07', 'closed'),
+(2456, 11134, 2, 'Cheese pizza without cheese? Came nearly bare.',                           'negative', '2024-12-08', 'responded'),
+(1145, 11156, 4, 'Solid choice. Reliable quality every time.',                              'positive', '2024-12-08', 'closed'),
+(1567, 11189, 5, 'New menu items are creative and well-executed.',                           'positive', '2024-12-09', 'closed'),
+(2203, 11212, 3, 'Decent for delivery. Better in person at the restaurant.',                'neutral',  '2024-12-09', 'pending'),
+(1234, 11234, 5, 'Outstanding. Genuinely impressed with the consistency.',                  'positive', '2024-12-10', 'closed'),
+(2567, 11256, 4, 'Good portion. Could be slightly hotter on arrival.',                      'positive', '2024-12-10', 'closed');
+
+-- ── 4. Verify ────────────────────────────────────────────────────────────────
+SELECT COUNT(*) AS total_rows FROM customer_feedback;
+-- Expected: 50
+
+SELECT sentiment, COUNT(*) AS cnt
+FROM   customer_feedback
+GROUP BY sentiment
+ORDER BY sentiment;
+-- Expected: positive ~22, neutral ~13, negative ~15
+
+SELECT MIN(feedback_date), MAX(feedback_date) FROM customer_feedback;
+-- Expected: 2024-11-15 to 2024-12-10

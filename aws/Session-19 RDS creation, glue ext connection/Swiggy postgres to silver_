@@ -1,0 +1,160 @@
+"""
+═══════════════════════════════════════════════════════════════════════════════
+  POSTGRES (RDS)  →  SILVER  ETL  JOB
+  AWS Glue PySpark Script  ·  Keystone Edtech  ·  Day 3.5
+═══════════════════════════════════════════════════════════════════════════════
+
+  WHAT THIS SCRIPT DOES
+  ─────────────────────
+  Reads the customer_feedback table from RDS Postgres (via a Glue Connection),
+  applies light cleaning, and writes Parquet to the silver layer.
+
+  This is our 5th source — bringing non-S3 data into the same pipeline.
+
+  INPUT
+  ─────
+  Source:      RDS Postgres (via Glue Connection: swiggy-postgres-conn)
+  Database:    swiggy_external
+  Table:       public.customer_feedback  (50 rows)
+
+  OUTPUT
+  ──────
+  S3 path:     s3://<your-bucket>/silver/customer_feedback/
+  Format:       Parquet, partitioned by sentiment
+
+  JOB PARAMETERS  (set in Glue Studio Job details tab)
+  ────────────────────────────────────────────────────
+  --target_path           s3://<your-bucket>/silver/customer_feedback
+  --connection_name       swiggy-postgres-conn
+
+  NETWORK PREREQUISITES  (covered in instructor guide)
+  ────────────────────────────────────────────────────
+  - Glue Connection (JDBC type, Postgres) must exist and be tested
+  - Glue Connection must reference a security group that allows self-ingress on port 5432
+  - VPC must have a NAT gateway (or VPC endpoints for S3 + Glue)
+  - Glue role must have permission to use the connection
+
+═══════════════════════════════════════════════════════════════════════════════
+"""
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.sql import functions as F
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GLUE BOILERPLATE
+# ──────────────────────────────────────────────────────────────────────────────
+args = getResolvedOptions(sys.argv, [
+    'JOB_NAME',
+    'target_path',
+    'connection_name',
+])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+TARGET_PATH      = args['target_path']
+CONNECTION_NAME  = args['connection_name']
+
+print(f"[INFO] Postgres→Silver job starting")
+print(f"[INFO] Connection:  {CONNECTION_NAME}")
+print(f"[INFO] Target path: {TARGET_PATH}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 1 — READ FROM POSTGRES VIA GLUE CONNECTION
+#  ────────────────────────────────────────────────
+#  Two ways to read JDBC in Glue:
+#
+#    (A) from_options with connection_type='postgresql'  ← what we use
+#         Pros: simple; uses the named Connection's network config
+#         Cons: full table read; no incremental
+#
+#    (B) from_catalog (if you've crawled the JDBC source first)
+#         Pros: catalog integration; supports bookmarks
+#         Cons: extra crawler setup
+#
+#  For teaching, (A) is clearer. (B) is the production pattern when you also
+#  want Athena to query the source — out of scope today.
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Reading customer_feedback from Postgres...")
+
+feedback_dyf = glueContext.create_dynamic_frame.from_options(
+    connection_type='postgresql',
+    connection_options={
+        'useConnectionProperties': 'true',
+        'connectionName':           CONNECTION_NAME,
+        'dbtable':                  'public.customer_feedback',
+    },
+    transformation_ctx='feedback_source'
+)
+
+feedback_df = feedback_dyf.toDF()
+print(f"[INFO] Read {feedback_df.count()} rows from Postgres")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 2 — LIGHT CLEANING
+#  ───────────────────────
+#  Real RDBMS sources are usually cleaner than CSVs (constraints prevent garbage),
+#  but we still:
+#    • Standardize sentiment to lowercase
+#    • Strip whitespace from feedback_text
+#    • Filter rows where rating is somehow out of range (defensive)
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Cleaning feedback data...")
+
+cleaned = (feedback_df
+    # Standardize sentiment to lowercase (in case of inconsistent capitalization)
+    .withColumn('sentiment', F.lower(F.trim(F.col('sentiment'))))
+    # Strip whitespace from feedback text
+    .withColumn('feedback_text', F.trim(F.col('feedback_text')))
+    # Defensive filter: rating must be 1-5 (constraint exists, but trust nothing)
+    .filter((F.col('rating') >= 1) & (F.col('rating') <= 5))
+    # Defensive filter: sentiment must be one of the 3 expected values
+    .filter(F.col('sentiment').isin('positive', 'neutral', 'negative'))
+    # Drop the auto-increment created_at column — we already have feedback_date
+    .drop('created_at')
+)
+
+print(f"[INFO] Cleaned row count: {cleaned.count()}")
+print(f"[INFO] Sentiment distribution:")
+cleaned.groupBy('sentiment').count().orderBy('sentiment').show()
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 3 — WRITE PARQUET TO S3, PARTITIONED BY SENTIMENT
+#  ────────────────────────────────────────────────────────
+#  Why partition by sentiment:
+#    Marketing analysts will overwhelmingly query "show me all negative feedback"
+#    or "show me positive comments." Partition pruning makes those queries cheap.
+#
+#  Why not partition by feedback_date:
+#    With only 50 rows across ~25 days, we'd get tiny per-partition files —
+#    classic small-files problem. Sentiment gives us 3 partitions at a healthy size.
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Writing to silver/customer_feedback...")
+
+cleaned_dyf = DynamicFrame.fromDF(cleaned, glueContext, 'feedback_silver')
+
+glueContext.write_dynamic_frame.from_options(
+    frame=cleaned_dyf,
+    connection_type='s3',
+    connection_options={
+        'path':           TARGET_PATH,
+        'partitionKeys':  ['sentiment'],
+    },
+    format='parquet',
+    transformation_ctx='feedback_silver_write'
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  COMMIT
+# ──────────────────────────────────────────────────────────────────────────────
+job.commit()
+print("[INFO] Postgres→Silver complete.")
+print("[INFO] Run swiggy-silver-crawler to register customer_feedback in catalog.")

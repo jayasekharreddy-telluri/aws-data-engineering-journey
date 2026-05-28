@@ -1,0 +1,403 @@
+"""
+═══════════════════════════════════════════════════════════════════════════════
+  SILVER  →  GOLD  ETL  JOB
+  AWS Glue PySpark Script  ·  Safe Rerun Version
+═══════════════════════════════════════════════════════════════════════════════
+"""
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GLUE BOILERPLATE
+# ─────────────────────────────────────────────────────────────────────────────
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'source_db', 'target_path'])
+
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+SOURCE_DB = args['source_db']
+TARGET_PATH = args['target_path']
+
+print(f"[INFO] Silver→Gold job starting")
+print(f"[INFO] Source DB: {SOURCE_DB}")
+print(f"[INFO] Target path: {TARGET_PATH}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPER FUNCTION
+# ─────────────────────────────────────────────────────────────────────────────
+def is_empty(df):
+    return df.rdd.isEmpty()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STEP 1 — READ SILVER TABLES
+# ─────────────────────────────────────────────────────────────────────────────
+print("[INFO] Reading silver tables from catalog...")
+
+orders_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB,
+    table_name='orders',
+    transformation_ctx='orders_silver_source'
+)
+
+restaurants_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB,
+    table_name='restaurants',
+    transformation_ctx='restaurants_silver_source'
+)
+
+customers_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB,
+    table_name='customers',
+    transformation_ctx='customers_silver_source'
+)
+
+order_items_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB,
+    table_name='order_items',
+    transformation_ctx='order_items_silver_source'
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONVERT TO DATAFRAMES
+# ─────────────────────────────────────────────────────────────────────────────
+orders = orders_dyf.toDF()
+
+restaurants = (
+    restaurants_dyf.toDF()
+    .fillna({"city": "unknown"})
+)
+
+customers = (
+    customers_dyf.toDF()
+    .fillna({"city": "unknown"})
+)
+
+order_items = order_items_dyf.toDF()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAFE EMPTY HANDLING
+# ─────────────────────────────────────────────────────────────────────────────
+if is_empty(orders):
+
+    print("[INFO] No silver data found.")
+    print("[INFO] No gold processing required.")
+    print("[INFO] Job completed successfully.")
+
+    job.commit()
+
+else:
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # FILTER DELIVERED ORDERS
+    # ─────────────────────────────────────────────────────────────────────────
+    delivered = orders.filter(F.col('status') == 'Delivered')
+
+    print(f"[INFO] Silver row counts — "
+          f"orders={orders.count()}, "
+          f"delivered={delivered.count()}, "
+          f"restaurants={restaurants.count()}, "
+          f"customers={customers.count()}, "
+          f"order_items={order_items.count()}")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GOLD TABLE 1 — DAILY CITY REVENUE
+    # ─────────────────────────────────────────────────────────────────────────
+    print("[INFO] Building gold.daily_city_revenue...")
+
+    daily_city_revenue = (
+        delivered.alias('o')
+        .join(
+            restaurants.alias('r'),
+            F.col('o.restaurant_id') == F.col('r.restaurant_id'),
+            'left'
+        )
+        .groupBy(
+            F.col('o.order_date').alias('order_date'),
+            F.col('r.city').alias('city')
+        )
+        .agg(
+            F.count('*').alias('total_orders'),
+            F.round(F.sum('o.total_amount'), 2).alias('total_revenue'),
+            F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+            F.round(F.max('o.total_amount'), 2).alias('largest_order')
+        )
+        .orderBy('order_date', F.desc('total_revenue'))
+    )
+
+    print(f"[INFO] daily_city_revenue rows: {daily_city_revenue.count()}")
+
+    if not is_empty(daily_city_revenue):
+
+        # PURGE OLD DATA
+        glueContext.purge_s3_path(
+            f"{TARGET_PATH}/daily_city_revenue/",
+            options={"retentionPeriod": 0}
+        )
+
+        daily_city_revenue_dyf = DynamicFrame.fromDF(
+            daily_city_revenue,
+            glueContext,
+            'daily_city_revenue'
+        )
+
+        glueContext.write_dynamic_frame.from_options(
+            frame=daily_city_revenue_dyf,
+            connection_type='s3',
+            connection_options={
+                'path': f"{TARGET_PATH}/daily_city_revenue/",
+                'partitionKeys': ['city']
+            },
+            format='parquet',
+            format_options={
+                'compression': 'snappy'
+            },
+            transformation_ctx='daily_city_revenue_write'
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GOLD TABLE 2 — TOP RESTAURANTS
+    # ─────────────────────────────────────────────────────────────────────────
+    print("[INFO] Building gold.top_restaurants...")
+
+    max_date = delivered.agg(F.max('order_date')).collect()[0][0]
+    cutoff_30d = F.date_sub(F.lit(max_date), 30)
+
+    restaurant_metrics = (
+        delivered.alias('o')
+        .filter(F.col('o.order_date') > cutoff_30d)
+        .join(
+            restaurants.alias('r'),
+            F.col('o.restaurant_id') == F.col('r.restaurant_id'),
+            'inner'
+        )
+        .groupBy(
+            F.col('r.restaurant_id').alias('restaurant_id'),
+            F.col('r.name').alias('restaurant_name'),
+            F.col('r.city').alias('city'),
+            F.col('r.cuisine').alias('cuisine'),
+            F.col('r.rating').alias('rating')
+        )
+        .agg(
+            F.count('*').alias('orders_30d'),
+            F.round(F.sum('o.total_amount'), 2).alias('revenue_30d'),
+            F.round(F.avg('o.total_amount'), 2).alias('avg_order_value')
+        )
+    )
+
+    city_window = Window.partitionBy('city').orderBy(F.desc('revenue_30d'))
+
+    top_restaurants = (
+        restaurant_metrics
+        .withColumn(
+            'rank_in_city',
+            F.row_number().over(city_window)
+        )
+        .filter(F.col('rank_in_city') <= 10)
+        .orderBy('city', 'rank_in_city')
+    )
+
+    print(f"[INFO] top_restaurants rows: {top_restaurants.count()}")
+
+    if not is_empty(top_restaurants):
+
+        # PURGE OLD DATA
+        glueContext.purge_s3_path(
+            f"{TARGET_PATH}/top_restaurants/",
+            options={"retentionPeriod": 0}
+        )
+
+        top_restaurants_dyf = DynamicFrame.fromDF(
+            top_restaurants,
+            glueContext,
+            'top_restaurants'
+        )
+
+        glueContext.write_dynamic_frame.from_options(
+            frame=top_restaurants_dyf,
+            connection_type='s3',
+            connection_options={
+                'path': f"{TARGET_PATH}/top_restaurants/",
+                'partitionKeys': ['city']
+            },
+            format='parquet',
+            format_options={
+                'compression': 'snappy'
+            },
+            transformation_ctx='top_restaurants_write'
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GOLD TABLE 3 — CUSTOMER SEGMENTS
+    # ─────────────────────────────────────────────────────────────────────────
+    print("[INFO] Building gold.customer_segments...")
+
+    customer_metrics = (
+        delivered.alias('o')
+        .join(
+            customers.alias('c'),
+            F.col('o.customer_id') == F.col('c.customer_id'),
+            'inner'
+        )
+        .groupBy(
+            F.col('c.customer_id').alias('customer_id'),
+            F.col('c.name').alias('customer_name'),
+            F.col('c.city').alias('city'),
+            F.col('c.joined_date').alias('joined_date')
+        )
+        .agg(
+            F.count('*').alias('total_orders'),
+            F.round(F.sum('o.total_amount'), 2).alias('total_spent'),
+            F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+            F.max('o.order_date').alias('last_order_date'),
+            F.countDistinct('o.restaurant_id').alias('distinct_restaurants')
+        )
+    )
+
+    customer_segments = (
+        customer_metrics
+        .withColumn(
+            'segment',
+            F.when(
+                (F.col('total_spent') >= 5000) &
+                (F.col('total_orders') >= 10),
+                F.lit('VIP')
+            ).when(
+                F.col('total_orders') >= 5,
+                F.lit('Regular')
+            ).otherwise(
+                F.lit('New')
+            )
+        )
+        .orderBy(F.desc('total_spent'))
+    )
+
+    print(f"[INFO] customer_segments rows: {customer_segments.count()}")
+
+    if not is_empty(customer_segments):
+
+        # PURGE OLD DATA
+        glueContext.purge_s3_path(
+            f"{TARGET_PATH}/customer_segments/",
+            options={"retentionPeriod": 0}
+        )
+
+        customer_segments_dyf = DynamicFrame.fromDF(
+            customer_segments,
+            glueContext,
+            'customer_segments'
+        )
+
+        glueContext.write_dynamic_frame.from_options(
+            frame=customer_segments_dyf,
+            connection_type='s3',
+            connection_options={
+                'path': f"{TARGET_PATH}/customer_segments/"
+            },
+            format='parquet',
+            format_options={
+                'compression': 'snappy'
+            },
+            transformation_ctx='customer_segments_write'
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GOLD TABLE 4 — CUISINE PERFORMANCE
+    # ─────────────────────────────────────────────────────────────────────────
+    print("[INFO] Building gold.cuisine_performance...")
+
+    cuisine_metrics = (
+        delivered.alias('o')
+        .join(
+            restaurants.alias('r'),
+            F.col('o.restaurant_id') == F.col('r.restaurant_id'),
+            'inner'
+        )
+        .groupBy(
+            F.col('r.city').alias('city'),
+            F.col('r.cuisine').alias('cuisine')
+        )
+        .agg(
+            F.count('*').alias('total_orders'),
+            F.round(F.sum('o.total_amount'), 2).alias('total_revenue'),
+            F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+            F.countDistinct('o.restaurant_id').alias('restaurants_in_cuisine')
+        )
+    )
+
+    city_total_window = Window.partitionBy('city')
+
+    cuisine_performance = (
+        cuisine_metrics
+        .withColumn(
+            'city_total_revenue',
+            F.sum('total_revenue').over(city_total_window)
+        )
+        .withColumn(
+            'revenue_share_pct',
+            F.round(
+                F.col('total_revenue') /
+                F.col('city_total_revenue') * 100,
+                2
+            )
+        )
+        .withColumn(
+            'cuisine_rank_in_city',
+            F.row_number().over(
+                Window.partitionBy('city')
+                .orderBy(F.desc('total_revenue'))
+            )
+        )
+        .drop('city_total_revenue')
+        .orderBy('city', 'cuisine_rank_in_city')
+    )
+
+    print(f"[INFO] cuisine_performance rows: {cuisine_performance.count()}")
+
+    if not is_empty(cuisine_performance):
+
+        # PURGE OLD DATA
+        glueContext.purge_s3_path(
+            f"{TARGET_PATH}/cuisine_performance/",
+            options={"retentionPeriod": 0}
+        )
+
+        cuisine_performance_dyf = DynamicFrame.fromDF(
+            cuisine_performance,
+            glueContext,
+            'cuisine_performance'
+        )
+
+        glueContext.write_dynamic_frame.from_options(
+            frame=cuisine_performance_dyf,
+            connection_type='s3',
+            connection_options={
+                'path': f"{TARGET_PATH}/cuisine_performance/",
+                'partitionKeys': ['city']
+            },
+            format='parquet',
+            format_options={
+                'compression': 'snappy'
+            },
+            transformation_ctx='cuisine_performance_write'
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # COMMIT
+    # ─────────────────────────────────────────────────────────────────────────
+    job.commit()
+
+    print("[INFO] Silver→Gold complete.")
+    print("[INFO] 4 gold tables written successfully.")
+    print("[INFO] Run gold crawler next.")

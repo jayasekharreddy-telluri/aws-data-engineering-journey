@@ -1,0 +1,477 @@
+# PostgreSQL RDS → Glue → S3 → Athena Practical
+
+## Practical Flow
+
+Local SQL Seed File
+↓
+PostgreSQL RDS
+↓
+CloudShell Validation
+↓
+AWS Secrets Manager
+↓
+Glue JDBC ETL Job
+↓
+S3 Silver Layer (Parquet)
+↓
+Glue Crawler
+↓
+Athena Querying
+
+---
+
+# Task 1 — Create PostgreSQL RDS Database
+
+## What We Did
+
+* Created PostgreSQL RDS instance
+* Enabled public connectivity
+* Configured database:
+
+  * DB Name → `swiggy_external`
+  * User → `postgres`
+
+## Purpose
+
+Create transactional database source for ETL pipeline.
+
+## Important Learning
+
+RDS acts as OLTP source system in data engineering pipelines.
+
+---
+
+# Task 2 — Configure Security Group
+
+## What We Did
+
+* Allowed inbound rule:
+
+  * Port → `5432`
+  * Source → public / Glue access
+
+## Purpose
+
+Allow PostgreSQL connections from CloudShell and Glue.
+
+## Important Learning
+
+Most JDBC failures happen due to networking/security group issues.
+
+---
+
+# Task 3 — Upload SQL Seed File
+
+## What We Did
+
+* Uploaded:
+
+```text
+customer_feedback_seed.sql
+```
+
+to CloudShell.
+
+## Purpose
+
+Load realistic Swiggy feedback dataset into RDS.
+
+## Important Learning
+
+Seed scripts help simulate production databases.
+
+---
+
+# Task 4 — Connect CloudShell to RDS
+
+## What We Did
+
+Used:
+
+```bash
+psql -h swiggy-customer-db.c5qo0eyiq2pe.ap-south-1.rds.amazonaws.com -U postgres -d swiggy_external
+```
+
+Entered password manually.
+
+## Purpose
+
+Validate RDS connectivity before Glue integration.
+
+## Important Learning
+
+Always test DB manually before debugging Glue.
+
+---
+
+# Task 5 — Execute Seed SQL File
+
+## What We Did
+
+Ran:
+
+```sql
+\i customer_feedback_seed.sql
+```
+
+inside psql.
+
+## Purpose
+
+Create:
+
+* database
+* table
+* indexes
+* 50 records
+
+## Important Learning
+
+ETL pipelines need realistic source datasets.
+
+---
+
+# Task 6 — Validate Database Schema
+
+## What We Did
+
+Checked:
+
+```sql
+\d customer_feedback
+```
+
+Viewed rows:
+
+```sql
+SELECT * FROM customer_feedback LIMIT 10;
+```
+
+## Purpose
+
+Verify schema and column names.
+
+## Important Learning
+
+Schema validation prevents Spark unresolved column errors.
+
+---
+
+# Task 7 — Create Secrets Manager Secret
+
+## What We Did
+
+Used RDS-generated secret:
+
+* username
+* password
+* host
+* port
+
+Copied Secret ARN.
+
+## Purpose
+
+Avoid hardcoded database credentials.
+
+## Important Learning
+
+Production ETL pipelines use Secrets Manager for security.
+
+---
+
+# Task 8 — Create S3 Silver Bucket
+
+## What We Did
+
+Created bucket:
+
+```text
+swiggy-rds-to-s3-lake
+```
+
+## Purpose
+
+Store transformed parquet data.
+
+## Important Learning
+
+S3 acts as centralized data lake storage.
+
+---
+
+# Task 9 — Create Glue ETL Job
+
+## What We Did
+
+Created Glue Spark job:
+
+* Glue Version → 5.1
+* Language → Python
+* Worker → G1X
+* Workers → 2
+
+## Purpose
+
+Run serverless ETL pipeline.
+
+## Important Learning
+
+Glue provides managed Spark execution.
+
+---
+
+# Task 10 — Configure Glue Job Parameters
+
+## What We Did
+
+Added parameters:
+
+```text
+--target_path
+s3://swiggy-rds-to-s3-lake/silver/customer_feedback
+```
+
+```text
+--secret_arn
+<SecretsManagerARN>
+```
+
+## Purpose
+
+Pass dynamic configuration to Glue job.
+
+## Important Learning
+
+Glue jobs should use runtime parameters instead of hardcoding values.
+
+---
+
+# Task 11 — Build JDBC PySpark ETL Script
+
+## What We Did
+
+Implemented:
+
+* boto3 secret retrieval
+* JDBC ingestion
+* dataframe transformation
+* parquet writing
+* partitioning
+
+## Purpose
+
+Move data from PostgreSQL → S3 Silver Layer.
+
+## Important Learning
+
+Direct JDBC ingestion can bypass unstable Glue Connections.
+
+---
+
+# Task 12 — Fix Glue Connection Failure
+
+## What We Did
+
+Skipped Glue Connection UI.
+
+Used:
+
+```python
+connection_type="jdbc"
+```
+
+directly.
+
+## Purpose
+
+Avoid STS/VPC Glue Connection issues.
+
+## Important Learning
+
+Glue Connections are optional abstractions.
+
+Real-world engineers often use direct JDBC.
+
+---
+
+# Task 13 — Fix Unresolved sentiment Column Error
+
+## What We Did
+
+Printed schema:
+
+```python
+df.printSchema()
+```
+
+Normalized columns safely.
+
+Validated actual DB columns.
+
+## Purpose
+
+Fix Spark AnalysisException.
+
+## Important Learning
+
+Always validate source schema before transformations.
+
+---
+
+# Task 14 — Fix S3 PutObject Permission Error
+
+## What We Did
+
+Attached S3 permissions to:
+
+```text
+GlueCourseRole
+```
+
+## Purpose
+
+Allow Glue to write parquet files into S3.
+
+## Important Learning
+
+Glue execution role needs:
+
+* S3 write
+* Secrets Manager read
+* CloudWatch logs access
+
+---
+
+# Task 15 — Write Partitioned Parquet Files
+
+## What We Did
+
+Stored parquet data in:
+
+```text
+silver/customer_feedback/
+```
+
+Partitioned by:
+
+```text
+sentiment
+```
+
+## Purpose
+
+Optimize Athena queries.
+
+## Important Learning
+
+Partitioning reduces Athena scanned data and cost.
+
+---
+
+# Task 16 — Validate S3 Output
+
+## What We Did
+
+Verified folders:
+
+```text
+sentiment=positive/
+sentiment=neutral/
+sentiment=negative/
+```
+
+## Purpose
+
+Confirm successful ETL output.
+
+## Important Learning
+
+Partition folders are physically created in S3.
+
+---
+
+# Task 17 — Create Glue Crawler
+
+## What We Did
+
+Crawler scanned:
+
+```text
+s3://swiggy-rds-to-s3-lake/silver/customer_feedback/
+```
+
+Created database:
+
+```text
+swiggy_silver_postgres_db
+```
+
+## Purpose
+
+Register parquet schema in Glue Catalog.
+
+## Important Learning
+
+Athena queries Glue Catalog metadata.
+
+---
+
+# Task 18 — Query Data Using Athena
+
+## What We Did
+
+Ran SQL queries on S3 parquet data.
+
+## Purpose
+
+Perform analytics on data lake.
+
+## Important Learning
+
+Athena enables serverless SQL analytics directly on S3.
+
+---
+
+# Errors Faced + Fixes
+
+| Error                  | Cause                  | Fix              |
+| ---------------------- | ---------------------- | ---------------- |
+| Glue Connection failed | STS/VPC issue          | Used direct JDBC |
+| sentiment unresolved   | Schema mismatch        | Validated schema |
+| S3 PutObject denied    | Missing IAM permission | Added S3 access  |
+| JDBC connection issues | Security group         | Opened port 5432 |
+
+---
+
+# Final Architecture Understanding
+
+Customer Feedback SQL File
+↓
+RDS PostgreSQL
+↓
+Glue JDBC ETL
+↓
+PySpark Cleaning
+↓
+S3 Parquet Silver Layer
+↓
+Glue Crawler
+↓
+Glue Catalog
+↓
+Athena Analytics
+
+---
+
+# Final Memory Line
+
+RDS stores transactional data
+↓
+Glue extracts + transforms
+↓
+S3 stores parquet lake data
+↓
+Crawler registers schema
+↓
+Athena performs analytics

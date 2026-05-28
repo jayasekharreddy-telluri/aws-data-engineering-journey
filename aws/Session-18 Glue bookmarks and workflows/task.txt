@@ -1,0 +1,421 @@
+# AWS Glue Day 3 — Practical Task Document
+
+# PRACTICAL FLOW
+
+```text
+Raw CSV
+   ↓
+Bronze Crawler
+   ↓
+Bronze → Silver ETL
+   ↓
+Bookmarks
+   ↓
+Silver Crawler
+   ↓
+Silver → Gold ETL
+   ↓
+Gold Crawler
+   ↓
+Athena Queries
+   ↓
+Glue Workflow Automation
+```
+
+---
+
+# Task 1 — Enable Job Bookmarks
+
+## What We Did
+
+* Opened Glue Job
+* Enabled:
+
+  ```text
+  Job bookmark → Enable
+  ```
+* Updated ETL script to support bookmarks
+
+## Purpose
+
+Enable incremental processing instead of full reload every run.
+
+## Important Learning
+
+Bookmarks process only new S3 files after previous successful execution.
+
+---
+
+# Task 2 — Added transformation_ctx to Glue Reads/Writes
+
+## What We Did
+
+Added:
+
+```python
+transformation_ctx='source_orders'
+```
+
+to all:
+
+* from_catalog()
+* write_dynamic_frame()
+
+## Purpose
+
+Allow Glue to track bookmark state.
+
+## Important Learning
+
+Without `transformation_ctx`, bookmarks do not work.
+
+---
+
+# Task 3 — Added job.commit()
+
+## What We Did
+
+Added:
+
+```python
+job.commit()
+```
+
+at end of ETL script.
+
+## Purpose
+
+Save bookmark state after successful run.
+
+## Important Learning
+
+Without `job.commit()`, bookmark state is never updated.
+
+---
+
+# Task 4 — Handled No-New-Data Scenario
+
+## What We Did
+
+Added logic:
+
+```python
+if df.count() == 0:
+    print("No new data")
+    job.commit()
+    sys.exit(0)
+```
+
+## Purpose
+
+Prevent Glue job failure when no new files arrive.
+
+## Important Learning
+
+Incremental jobs must exit gracefully when no data exists.
+
+---
+
+# Task 5 — Fixed Bookmark Argument Error
+
+## What We Did
+
+Resolved error:
+
+```text
+GlueArgumentError:
+--job_bookmark_option required
+```
+
+by removing manual argument handling and using Glue Job Bookmark setting correctly.
+
+## Purpose
+
+Allow Glue to manage bookmarks automatically.
+
+## Important Learning
+
+Bookmarks should be enabled from Job Details, not manually through script arguments.
+
+---
+
+# Task 6 — Built Silver → Gold ETL Job
+
+## What We Did
+
+Created PySpark ETL job that:
+
+* Read Silver tables
+* Applied aggregations
+* Used joins
+* Used window functions
+* Wrote Gold Parquet tables
+
+Created tables:
+
+* daily_city_revenue
+* top_restaurants
+* customer_segments
+* cuisine_performance
+
+## Purpose
+
+Convert clean operational data into business analytics tables.
+
+## Important Learning
+
+Gold layer is business-focused aggregated data.
+
+---
+
+# Task 7 — Used Window Functions
+
+## What We Did
+
+Implemented:
+
+* ROW_NUMBER()
+* SUM() OVER PARTITION
+
+Examples:
+
+```python
+row_number().over(window)
+```
+
+## Purpose
+
+Build rankings and percentage-share analytics.
+
+## Important Learning
+
+Window functions preserve rows while adding analytical calculations.
+
+---
+
+# Task 8 — Wrote Gold Data to S3
+
+## What We Did
+
+Stored Gold tables as:
+
+```text
+Parquet
+```
+
+inside:
+
+```text
+s3://bucket/gold/
+```
+
+Used partitioning by:
+
+```text
+city
+```
+
+for large tables.
+
+## Purpose
+
+Optimize Athena query performance.
+
+## Important Learning
+
+Partition only on frequently filtered columns.
+
+---
+
+# Task 9 — Created Gold Crawler
+
+## What We Did
+
+Created Glue crawler for:
+
+```text
+gold/
+```
+
+path.
+
+Created database:
+
+```text
+swiggy_gold_db
+```
+
+## Purpose
+
+Make Gold tables queryable in Athena.
+
+## Important Learning
+
+Crawler updates Glue Data Catalog metadata automatically.
+
+---
+
+# Task 10 — Verified Gold Tables in Athena
+
+## What We Did
+
+Executed SQL queries against:
+
+```text
+swiggy_gold_db
+```
+
+Validated:
+
+* revenue
+* rankings
+* customer segments
+* cuisine analytics
+
+## Purpose
+
+Verify ETL outputs and business metrics.
+
+## Important Learning
+
+Athena directly queries Parquet from S3 using Glue Catalog metadata.
+
+---
+
+# Task 11 — Created Glue Workflow
+
+## What We Did
+
+Created workflow:
+
+```text
+swiggy-medallion-workflow
+```
+
+## Purpose
+
+Orchestrate full ETL pipeline automatically.
+
+## Important Learning
+
+Workflow is orchestration layer, not ETL logic.
+
+---
+
+# Task 12 — Added Schedule Trigger
+
+## What We Did
+
+Created:
+
+```text
+Schedule Trigger
+```
+
+Configured daily execution.
+
+## Purpose
+
+Automatically start pipeline every day.
+
+## Important Learning
+
+AWS schedules use UTC timezone.
+
+---
+
+# Task 13 — Added Event Triggers
+
+## What We Did
+
+Created conditional triggers:
+
+```text
+Crawler Success
+      ↓
+Run Job
+```
+
+Connected:
+
+* Raw crawler → Silver ETL
+* Silver ETL → Silver crawler
+* Silver crawler → Gold ETL
+* Gold ETL → Gold crawler
+
+## Purpose
+
+Automate dependency execution chain.
+
+## Important Learning
+
+Event triggers are core orchestration logic in Glue Workflows.
+
+---
+
+# Task 14 — Executed End-to-End Workflow
+
+## What We Did
+
+Ran complete workflow.
+
+Validated successful execution of:
+
+* crawlers
+* ETL jobs
+* triggers
+* orchestration chain
+
+## Purpose
+
+Verify production-style automated pipeline.
+
+## Important Learning
+
+Workflow graph provides centralized execution visibility.
+
+---
+
+# ERRORS FACED + FIXES
+
+| Error                      | Fix                                      |
+| -------------------------- | ---------------------------------------- |
+| Bookmark argument error    | Enabled bookmark from Job Details        |
+| No data caused failure     | Added graceful exit logic                |
+| Missing transformation_ctx | Added to all reads/writes                |
+| Bookmark not updating      | Added job.commit()                       |
+| Invalid cron expression    | Used correct Glue schedule configuration |
+
+---
+
+# FINAL ARCHITECTURE UNDERSTANDING
+
+```text
+Raw CSV Files
+      ↓
+Bronze Layer (Crawler)
+      ↓
+Silver ETL (Incremental + Cleaned)
+      ↓
+Silver Catalog
+      ↓
+Gold ETL (Business Aggregations)
+      ↓
+Gold Catalog
+      ↓
+Athena Analytics
+      ↓
+Workflow Automation
+```
+
+---
+
+# FINAL MEMORY LINE
+
+```text
+Bookmarks make ETL incremental.
+Gold layer creates business analytics.
+Window functions power advanced analytics.
+Workflows orchestrate execution.
+Triggers automate the pipeline.
+```

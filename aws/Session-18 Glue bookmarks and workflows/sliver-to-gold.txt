@@ -1,0 +1,324 @@
+Swiggy silver to gold
+"""
+═══════════════════════════════════════════════════════════════════════════════
+  SILVER  →  GOLD  ETL  JOB
+  AWS Glue PySpark Script  ·  Keystone Edtech  ·  Day 3
+═══════════════════════════════════════════════════════════════════════════════
+
+  WHAT THIS SCRIPT DOES
+  ─────────────────────
+  Reads the silver layer (cleaned Parquet from Day 2) and produces 4 aggregated
+  gold tables that answer 5 of the 6 mini-project business questions:
+
+    1.  daily_city_revenue       — date + city + orders + revenue + AOV
+    2.  top_restaurants            — restaurant + 30d metrics + rank within city
+    3.  customer_segments          — per-customer total spend + LTV segment
+    4.  cuisine_performance        — cuisine + city + revenue + share
+
+  INPUT
+  ─────
+  Database:  swiggy_silver_db   (Parquet, populated by Day 2 ETL job)
+  Tables:    customers, restaurants, orders, order_items
+
+  OUTPUT
+  ──────
+  S3 path:   s3://<your-bucket>/gold/
+             ├── daily_city_revenue/             (Parquet, partitioned by city)
+             ├── top_restaurants/                (Parquet, partitioned by city)
+             ├── customer_segments/              (Parquet, no partition)
+             └── cuisine_performance/            (Parquet, partitioned by city)
+
+  JOB PARAMETERS  (set in Glue Studio Job details tab)
+  ────────────────────────────────────────────────────
+  --source_db      swiggy_silver_db
+  --target_path    s3://<your-bucket>/gold
+
+  WHY ONE JOB FOR ALL 4 TABLES
+  ────────────────────────────
+  For teaching: one job means students see one save, one run, one log stream.
+  In production you'd split each gold table into its own job for fault isolation —
+  if customer_segments fails, the other 3 tables shouldn't be blocked.
+
+═══════════════════════════════════════════════════════════════════════════════
+"""
+
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GLUE BOILERPLATE  —  do not modify
+# ──────────────────────────────────────────────────────────────────────────────
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'source_db', 'target_path'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+SOURCE_DB    = args['source_db']      # swiggy_silver_db
+TARGET_PATH  = args['target_path']    # s3://<bucket>/gold
+
+print(f"[INFO] Silver→Gold job starting")
+print(f"[INFO] Source DB:  {SOURCE_DB}")
+print(f"[INFO] Target path: {TARGET_PATH}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STEP 1 — READ SILVER TABLES FROM CATALOG
+#  ─────────────────────────────────────────
+#  All 4 silver tables; we'll join + aggregate from these.
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Reading silver tables from catalog...")
+
+orders_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='orders',
+    transformation_ctx='orders_silver_source'
+)
+restaurants_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='restaurants',
+    transformation_ctx='restaurants_silver_source'
+)
+customers_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='customers',
+    transformation_ctx='customers_silver_source'
+)
+order_items_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=SOURCE_DB, table_name='order_items',
+    transformation_ctx='order_items_silver_source'
+)
+
+# Convert to DataFrames for the aggregation work
+orders      = orders_dyf.toDF()
+restaurants = restaurants_dyf.toDF()
+customers   = customers_dyf.toDF()
+order_items = order_items_dyf.toDF()
+
+# Filter to delivered orders only — gold layer is for completed business activity
+delivered = orders.filter(F.col('status') == 'Delivered')
+
+print(f"[INFO] Silver row counts — "
+      f"orders={orders.count()}, delivered={delivered.count()}, "
+      f"restaurants={restaurants.count()}, customers={customers.count()}, "
+      f"order_items={order_items.count()}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GOLD TABLE 1 — DAILY CITY REVENUE
+#  ────────────────────────────────────
+#  Q: "How much revenue did each city generate each day?"
+#  Grain:  one row per (order_date, city)
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Building gold.daily_city_revenue...")
+
+daily_city_revenue = (
+    delivered.alias('o')
+    .join(restaurants.alias('r'), F.col('o.restaurant_id') == F.col('r.restaurant_id'), 'left')
+    .groupBy(F.col('o.order_date').alias('order_date'),
+             F.col('r.city').alias('city'))
+    .agg(
+        F.count('*').alias('total_orders'),
+        F.round(F.sum('o.total_amount'), 2).alias('total_revenue'),
+        F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+        F.round(F.max('o.total_amount'), 2).alias('largest_order'),
+    )
+    .orderBy('order_date', F.desc('total_revenue'))
+)
+
+print(f"[INFO]   daily_city_revenue: {daily_city_revenue.count()} rows")
+
+daily_city_revenue_dyf = DynamicFrame.fromDF(daily_city_revenue, glueContext, 'daily_city_revenue')
+glueContext.write_dynamic_frame.from_options(
+    frame=daily_city_revenue_dyf,
+    connection_type='s3',
+    connection_options={
+        'path': f"{TARGET_PATH}/daily_city_revenue/",
+        'partitionKeys': ['city']
+    },
+    format='parquet',
+    transformation_ctx='daily_city_revenue_write'
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GOLD TABLE 2 — TOP RESTAURANTS  (uses WINDOW FUNCTIONS)
+#  ─────────────────────────────────────────────────────────
+#  Q: "Top 10 restaurants by revenue in the last 30 days, per city."
+#  Grain:  one row per restaurant; rank assigned within each city
+#  Window: ROW_NUMBER() over PARTITION BY city ORDER BY revenue DESC
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Building gold.top_restaurants...")
+
+# Compute the 30-day cutoff from the latest order date in the dataset
+# (using max(order_date) because our static dataset doesn't move forward in time)
+max_date = delivered.agg(F.max('order_date')).collect()[0][0]
+cutoff_30d = F.date_sub(F.lit(max_date), 30)
+
+restaurant_metrics = (
+    delivered.alias('o')
+    .filter(F.col('o.order_date') > cutoff_30d)
+    .join(restaurants.alias('r'), F.col('o.restaurant_id') == F.col('r.restaurant_id'), 'inner')
+    .groupBy(
+        F.col('r.restaurant_id').alias('restaurant_id'),
+        F.col('r.name').alias('restaurant_name'),
+        F.col('r.city').alias('city'),
+        F.col('r.cuisine').alias('cuisine'),
+        F.col('r.rating').alias('rating'),
+    )
+    .agg(
+        F.count('*').alias('orders_30d'),
+        F.round(F.sum('o.total_amount'), 2).alias('revenue_30d'),
+        F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+    )
+)
+
+# WINDOW FUNCTION: rank restaurants within each city by revenue
+city_window = Window.partitionBy('city').orderBy(F.desc('revenue_30d'))
+
+top_restaurants = (
+    restaurant_metrics
+    .withColumn('rank_in_city', F.row_number().over(city_window))
+    .filter(F.col('rank_in_city') <= 10)              # keep top 10 per city
+    .orderBy('city', 'rank_in_city')
+)
+
+print(f"[INFO]   top_restaurants: {top_restaurants.count()} rows  (top 10 × ~8 cities)")
+
+top_restaurants_dyf = DynamicFrame.fromDF(top_restaurants, glueContext, 'top_restaurants')
+glueContext.write_dynamic_frame.from_options(
+    frame=top_restaurants_dyf,
+    connection_type='s3',
+    connection_options={
+        'path': f"{TARGET_PATH}/top_restaurants/",
+        'partitionKeys': ['city']
+    },
+    format='parquet',
+    transformation_ctx='top_restaurants_write'
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GOLD TABLE 3 — CUSTOMER SEGMENTS  (uses CASE WHEN with aggregates)
+#  ─────────────────────────────────────────────────────────────────────
+#  Q: "Who are our high-value customers vs casual customers?"
+#  Grain:  one row per customer
+#  Segment logic:
+#    VIP      — total_spent >= 5000 AND total_orders >= 10
+#    Regular  — total_orders >= 5
+#    New       — anything else
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Building gold.customer_segments...")
+
+customer_metrics = (
+    delivered.alias('o')
+    .join(customers.alias('c'), F.col('o.customer_id') == F.col('c.customer_id'), 'inner')
+    .groupBy(
+        F.col('c.customer_id').alias('customer_id'),
+        F.col('c.name').alias('customer_name'),
+        F.col('c.city').alias('city'),
+        F.col('c.joined_date').alias('joined_date'),
+    )
+    .agg(
+        F.count('*').alias('total_orders'),
+        F.round(F.sum('o.total_amount'), 2).alias('total_spent'),
+        F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+        F.max('o.order_date').alias('last_order_date'),
+        F.countDistinct('o.restaurant_id').alias('distinct_restaurants'),
+    )
+)
+
+# Conditional update — segment classification
+customer_segments = (
+    customer_metrics
+    .withColumn(
+        'segment',
+        F.when(
+            (F.col('total_spent') >= 5000) & (F.col('total_orders') >= 10),
+            F.lit('VIP')
+        ).when(
+            F.col('total_orders') >= 5,
+            F.lit('Regular')
+        ).otherwise(
+            F.lit('New')
+        )
+    )
+    .orderBy(F.desc('total_spent'))
+)
+
+print(f"[INFO]   customer_segments: {customer_segments.count()} rows")
+
+customer_segments_dyf = DynamicFrame.fromDF(customer_segments, glueContext, 'customer_segments')
+glueContext.write_dynamic_frame.from_options(
+    frame=customer_segments_dyf,
+    connection_type='s3',
+    connection_options={
+        'path': f"{TARGET_PATH}/customer_segments/"
+        # no partitioning — small table (~2K rows), low cardinality
+    },
+    format='parquet',
+    transformation_ctx='customer_segments_write'
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GOLD TABLE 4 — CUISINE PERFORMANCE  (uses WINDOW for share calculation)
+#  ──────────────────────────────────────────────────────────────────────────
+#  Q: "Which cuisines drive revenue in each city, and what % of city total?"
+#  Grain:  one row per (city, cuisine)
+#  Window: SUM(revenue) OVER PARTITION BY city — to compute city total for share %
+# ──────────────────────────────────────────────────────────────────────────────
+print("[INFO] Building gold.cuisine_performance...")
+
+cuisine_metrics = (
+    delivered.alias('o')
+    .join(restaurants.alias('r'), F.col('o.restaurant_id') == F.col('r.restaurant_id'), 'inner')
+    .groupBy(
+        F.col('r.city').alias('city'),
+        F.col('r.cuisine').alias('cuisine'),
+    )
+    .agg(
+        F.count('*').alias('total_orders'),
+        F.round(F.sum('o.total_amount'), 2).alias('total_revenue'),
+        F.round(F.avg('o.total_amount'), 2).alias('avg_order_value'),
+        F.countDistinct('o.restaurant_id').alias('restaurants_in_cuisine'),
+    )
+)
+
+# WINDOW FUNCTION: city total revenue (so we can compute % share per cuisine)
+city_total_window = Window.partitionBy('city')
+
+cuisine_performance = (
+    cuisine_metrics
+    .withColumn('city_total_revenue',
+                F.sum('total_revenue').over(city_total_window))
+    .withColumn('revenue_share_pct',
+                F.round(F.col('total_revenue') / F.col('city_total_revenue') * 100, 2))
+    .withColumn('cuisine_rank_in_city',
+                F.row_number().over(
+                    Window.partitionBy('city').orderBy(F.desc('total_revenue'))
+                ))
+    .drop('city_total_revenue')   # dropped — only needed as intermediate
+    .orderBy('city', 'cuisine_rank_in_city')
+)
+
+print(f"[INFO]   cuisine_performance: {cuisine_performance.count()} rows")
+
+cuisine_performance_dyf = DynamicFrame.fromDF(cuisine_performance, glueContext, 'cuisine_performance')
+glueContext.write_dynamic_frame.from_options(
+    frame=cuisine_performance_dyf,
+    connection_type='s3',
+    connection_options={
+        'path': f"{TARGET_PATH}/cuisine_performance/",
+        'partitionKeys': ['city']
+    },
+    format='parquet',
+    transformation_ctx='cuisine_performance_write'
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  COMMIT
+# ──────────────────────────────────────────────────────────────────────────────
+job.commit()
+print("[INFO] Silver→Gold complete. 4 gold tables written.")
+print("[INFO] Run swiggy-gold-crawler next to make these queryable in Athena.")
