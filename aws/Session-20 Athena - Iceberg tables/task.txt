@@ -1,0 +1,549 @@
+# Athena + Iceberg Practical Task Document
+
+# Practical Flow
+
+S3 Bucket Setup
+↓
+Athena Query Configuration
+↓
+Gold Table Verification
+↓
+Athena Optimization Testing
+↓
+Iceberg Database Creation
+↓
+Parquet → Iceberg Conversion
+↓
+Snapshot Verification
+↓
+INSERT Practical
+↓
+Time Travel Practical
+↓
+DELETE Practical
+↓
+Recovery Practical
+↓
+Schema Evolution Debugging
+
+---
+
+# Task 1 — Configure Athena Query Result Location
+
+## What We Did
+
+* Opened Athena Query Editor
+* Configured query result location:
+
+```text
+s3://swiggy-de-course-jk-20260520/athena-results/
+```
+
+## Purpose
+
+Athena stores query outputs in S3.
+
+## Important Learning
+
+Athena requires:
+
+* S3 result bucket
+* correct region
+* proper permissions
+
+---
+
+# Task 2 — Verify Athena Databases
+
+## What We Did
+
+Executed:
+
+```sql
+SHOW DATABASES;
+```
+
+Verified:
+
+* swiggy_gold_db
+* swiggy_silver_db
+* swiggy_raw_db
+
+## Purpose
+
+Validate Glue Catalog metadata visibility.
+
+## Important Learning
+
+Athena reads metadata from Glue Catalog, not directly from S3 structure.
+
+---
+
+# Task 3 — Verify Gold Layer Tables
+
+## What We Did
+
+Executed:
+
+```sql
+SHOW TABLES IN swiggy_gold_db;
+```
+
+Verified:
+
+* cuisine_performance
+* customer_segments
+* daily_city_revenue
+* top_restaurants
+
+## Purpose
+
+Confirm Gold analytics tables are queryable.
+
+## Important Learning
+
+Gold Layer contains:
+
+* aggregated
+* business-ready
+* analytics-focused datasets
+
+---
+
+# Task 4 — Run Athena Smoke Test Query
+
+## What We Did
+
+Executed:
+
+```sql
+SELECT *
+FROM swiggy_gold_db.daily_city_revenue
+LIMIT 10;
+```
+
+Verified:
+
+* query execution
+* result visibility
+* data scanned
+
+## Purpose
+
+Validate Athena query functionality.
+
+## Important Learning
+
+Athena directly queries S3 data without loading into database.
+
+---
+
+# Task 5 — Partition Pruning Practical
+
+## What We Did
+
+Executed optimized query:
+
+```sql
+SELECT order_date,total_revenue
+FROM swiggy_gold_db.daily_city_revenue
+WHERE city='Bangalore';
+```
+
+Executed non-optimized query:
+
+```sql
+SELECT *
+FROM swiggy_gold_db.daily_city_revenue;
+```
+
+Compared:
+
+* 4.09 KB scan
+* 65.05 KB scan
+
+## Purpose
+
+Demonstrate partition pruning + columnar optimization.
+
+## Important Learning
+
+Partition filter reduces:
+
+* scanned files
+* query cost
+* execution time
+
+---
+
+# Task 6 — Result Reuse Practical
+
+## What We Did
+
+Executed aggregation query twice:
+
+```sql
+SELECT cuisine,
+SUM(total_revenue)
+FROM swiggy_gold_db.cuisine_performance
+GROUP BY cuisine;
+```
+
+Observed reused query result behavior.
+
+## Purpose
+
+Understand Athena result caching.
+
+## Important Learning
+
+Athena can reuse recent query results to reduce scan cost.
+
+---
+
+# Task 7 — Create Iceberg Database
+
+## What We Did
+
+Executed:
+
+```sql
+CREATE DATABASE IF NOT EXISTS swiggy_iceberg_db;
+```
+
+## Purpose
+
+Create dedicated Iceberg metadata database.
+
+## Important Learning
+
+Iceberg tables are registered through Glue Catalog metadata.
+
+---
+
+# Task 8 — Create Iceberg Table Using CTAS
+
+## What We Did
+
+Executed:
+
+```sql
+CREATE TABLE swiggy_iceberg_db.daily_city_revenue
+WITH (
+table_type='ICEBERG',
+location='s3://swiggy-de-course-jk-20260520/iceberg/daily_city_revenue/',
+is_external=false,
+format='PARQUET',
+write_compression='SNAPPY',
+partitioning=ARRAY['city']
+)
+AS
+SELECT *
+FROM swiggy_gold_db.daily_city_revenue;
+```
+
+## Purpose
+
+Convert normal Parquet table into Iceberg-managed table.
+
+## Important Learning
+
+Iceberg:
+
+* manages metadata
+* Parquet stores actual data
+
+---
+
+# Task 9 — Verify Iceberg Table
+
+## What We Did
+
+Executed:
+
+```sql
+SELECT COUNT(*)
+FROM swiggy_iceberg_db.daily_city_revenue;
+```
+
+Verified:
+
+```text
+2575 rows
+```
+
+## Purpose
+
+Validate Iceberg table creation.
+
+## Important Learning
+
+Athena successfully queried Iceberg-managed Parquet files.
+
+---
+
+# Task 10 — Verify Iceberg Snapshots
+
+## What We Did
+
+Executed:
+
+```sql
+SELECT *
+FROM "swiggy_iceberg_db"."daily_city_revenue$snapshots";
+```
+
+Observed:
+
+* snapshot_id
+* operation
+* committed_at
+
+## Purpose
+
+Understand Iceberg snapshot mechanism.
+
+## Important Learning
+
+Every table modification creates immutable snapshot version.
+
+---
+
+# Task 11 — INSERT Into Iceberg Table
+
+## What We Did
+
+Initial INSERT failed due to column mismatch.
+
+Wrong Query:
+
+```sql
+INSERT INTO table
+VALUES(...)
+```
+
+Fixed Query:
+
+```sql
+INSERT INTO table
+(column1,column2,...)
+VALUES(...);
+```
+
+## Purpose
+
+Insert new records into Iceberg table.
+
+## Important Learning
+
+Always specify column names during INSERT to avoid TYPE_MISMATCH.
+
+---
+
+# Task 12 — Verify Snapshot After INSERT
+
+## What We Did
+
+Queried snapshots again after INSERT.
+
+Observed:
+
+* new snapshot created
+* operation=append
+
+## Purpose
+
+Track table versioning after data modification.
+
+## Important Learning
+
+Iceberg creates new snapshot instead of overwriting old data.
+
+---
+
+# Task 13 — Time Travel Practical
+
+## What We Did
+
+Executed:
+
+```sql
+FOR VERSION AS OF snapshot_id
+```
+
+Queried older snapshot data.
+
+## Purpose
+
+Read historical table state.
+
+## Important Learning
+
+Time travel enables:
+
+* auditing
+* rollback
+* historical analysis
+
+---
+
+# Task 14 — DELETE Practical
+
+## What We Did
+
+Executed:
+
+```sql
+DELETE
+FROM swiggy_iceberg_db.daily_city_revenue
+WHERE city='Bangalore'
+AND order_date=DATE '2024-12-11';
+```
+
+Verified deletion.
+
+## Purpose
+
+Test Iceberg DELETE support.
+
+## Important Learning
+
+Normal Athena Parquet tables do not support DELETE.
+
+---
+
+# Task 15 — Snapshot Verification After DELETE
+
+## What We Did
+
+Queried snapshot history again.
+
+Observed:
+
+```text
+operation=overwrite
+```
+
+## Purpose
+
+Track DELETE transaction behavior.
+
+## Important Learning
+
+DELETE creates new snapshot metadata state.
+
+---
+
+# Task 16 — Recover Deleted Data Using Time Travel
+
+## What We Did
+
+Executed:
+
+```sql
+INSERT INTO current_table
+SELECT *
+FROM table
+FOR VERSION AS OF old_snapshot
+WHERE condition;
+```
+
+Recovered deleted records.
+
+## Purpose
+
+Demonstrate snapshot-based recovery.
+
+## Important Learning
+
+Iceberg recovery:
+
+* no backup restore
+* no downtime
+* metadata-driven
+
+---
+
+# Task 17 — Schema Evolution Debugging
+
+## What We Did
+
+Tried:
+
+```sql
+ALTER TABLE ADD COLUMN
+```
+
+Faced parser errors:
+
+```text
+day_of_weekvarchar
+```
+
+Investigated:
+
+* syntax
+* Athena engine behavior
+* Iceberg DDL compatibility
+
+## Purpose
+
+Understand Athena Iceberg schema evolution limitations.
+
+## Important Learning
+
+Athena Engine Version differences affect Iceberg DDL support.
+
+---
+
+# Errors Faced + Fixes
+
+| Error                           | Cause                               | Fix                               |
+| ------------------------------- | ----------------------------------- | --------------------------------- |
+| TYPE_MISMATCH                   | Wrong INSERT column order           | Specify column names              |
+| day_of_weekvarchar parser issue | Athena parser/engine limitation     | Investigated engine compatibility |
+| ALTER TABLE syntax issues       | Engine-specific Iceberg DDL support | Use compatible Athena engine      |
+
+---
+
+# Final Architecture Understanding
+
+S3
+→ stores Parquet files
+
+Glue Catalog
+→ stores metadata
+
+Athena
+→ query engine
+
+Iceberg
+→ metadata + snapshot management layer
+
+Parquet
+→ optimized columnar storage
+
+---
+
+# Full Architecture Flow
+
+Source Data
+↓
+S3 Data Lake
+↓
+Glue Catalog Metadata
+↓
+Athena Queries
+↓
+Iceberg Snapshot Layer
+↓
+Time Travel + ACID + Recovery
+
+---
+
+# Final Memory Line
+
+Athena queries S3
+Parquet optimizes reads
+Glue manages metadata
+Iceberg manages snapshots + ACID + recovery.

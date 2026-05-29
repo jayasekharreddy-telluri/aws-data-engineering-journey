@@ -1,0 +1,365 @@
+-- ═══════════════════════════════════════════════════════════════════════════════
+--   DAY 4 — ATHENA QUERIES
+--   AWS DE Course · Keystone Edtech
+--   Athena Foundations + Iceberg
+-- ═══════════════════════════════════════════════════════════════════════════════
+--
+--   HOW TO USE THIS FILE
+--   ────────────────────
+--   Open Athena Query Editor. Run queries one section at a time.
+--   Each section maps to a block in today's instructor guide.
+--   Pre-written so you don't type SQL live — just paste and run.
+--
+--   DATABASES USED TODAY
+--   ─────────────────────
+--   swiggy_silver_db   →  cleaned silver tables (Days 2-3.5)
+--   swiggy_gold_db     →  aggregated gold tables (Day 3)
+--   swiggy_iceberg_db  →  new Iceberg database (created today)
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BLOCK 2 — ATHENA FOUNDATIONS
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- 2A. Smoke test — verify all gold tables are queryable
+SELECT 'daily_city_revenue'  AS table_name, COUNT(*) AS row_count FROM swiggy_gold_db.daily_city_revenue
+UNION ALL
+SELECT 'top_restaurants',                    COUNT(*) FROM swiggy_gold_db.top_restaurants
+UNION ALL
+SELECT 'customer_segments',                  COUNT(*) FROM swiggy_gold_db.customer_segments
+UNION ALL
+SELECT 'cuisine_performance',                COUNT(*) FROM swiggy_gold_db.cuisine_performance;
+-- Expected: 4 rows, each with their respective counts
+
+
+-- 2B. Check how much data today's queries will scan (use EXPLAIN)
+-- Run this first in workgroup with per-query data limit set
+SELECT city, SUM(total_revenue) AS total_rev
+FROM   swiggy_gold_db.daily_city_revenue
+WHERE  city = 'Bangalore'
+GROUP BY city;
+-- Check "Data scanned" in the query results pane after run
+-- Shows cost of non-partitioned scan vs partition-pruned scan
+
+
+-- 2C. Query history — find your most expensive queries
+-- Run in Athena → Recent queries tab (not in editor)
+-- Look for queries with highest "Data scanned" column
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BLOCK 3 — ATHENA OPTIMIZATION
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- 3A. Partition pruning demo — WITH partition filter (fast, cheap)
+SELECT order_date, total_orders, total_revenue
+FROM   swiggy_gold_db.daily_city_revenue
+WHERE  city = 'Bangalore'          -- ← partition filter
+ORDER BY order_date DESC
+LIMIT 10;
+-- Note the "Data scanned" — only Bangalore partition read
+
+
+-- 3B. Without partition filter (slower, more expensive)
+SELECT order_date, city, total_orders, total_revenue
+FROM   swiggy_gold_db.daily_city_revenue
+ORDER BY total_revenue DESC
+LIMIT 10;
+-- Note the "Data scanned" — ALL city partitions read
+-- Compare to 3A — same result set available, but 3A costs less
+
+
+-- 3C. Columnar advantage demo — select fewer columns
+-- This scans LESS data because Parquet is columnar
+SELECT order_date, total_revenue
+FROM   swiggy_gold_db.daily_city_revenue
+WHERE  city = 'Mumbai';
+-- vs
+SELECT *
+FROM   swiggy_gold_db.daily_city_revenue
+WHERE  city = 'Mumbai';
+-- Run both, compare "Data scanned" — SELECT * costs more
+
+
+-- 3D. Result reuse demo
+-- Run this query twice in quick succession (within 24 hours)
+SELECT cuisine, SUM(total_revenue) AS rev
+FROM   swiggy_gold_db.cuisine_performance
+GROUP BY cuisine
+ORDER BY rev DESC;
+-- Second run: check "Data scanned" = 0 bytes — served from cache
+-- Athena reuses results for identical queries on unchanged data
+
+
+-- 3E. Approximate aggregations (faster on large datasets)
+SELECT approx_distinct(customer_id) AS approx_unique_customers
+FROM   swiggy_silver_db.orders;
+-- approx_distinct is ~2% error but much faster than COUNT(DISTINCT)
+-- Use for dashboards where exactness isn't critical
+
+
+-- 3F. Cross-source query combining silver + gold
+SELECT
+    g.city,
+    g.cuisine,
+    g.revenue_share_pct,
+    COUNT(o.order_id) AS silver_order_count
+FROM swiggy_gold_db.cuisine_performance g
+JOIN swiggy_silver_db.orders o
+    ON g.city = o.city
+WHERE g.cuisine_rank_in_city <= 3
+GROUP BY g.city, g.cuisine, g.revenue_share_pct
+ORDER BY g.city, g.revenue_share_pct DESC;
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BLOCK 4 — ICEBERG SETUP
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- 4A. Create the Iceberg database
+-- Run this ONCE before any other Iceberg queries
+CREATE DATABASE IF NOT EXISTS swiggy_iceberg_db;
+
+
+-- 4B. Create Iceberg table from existing gold data (CTAS)
+-- Replace <your-bucket> with your actual S3 bucket name
+-- This is the main conversion — run it and walk through the output
+CREATE TABLE swiggy_iceberg_db.daily_city_revenue
+WITH (
+    table_type         = 'ICEBERG',
+    location           = 's3://<your-bucket>/iceberg/daily_city_revenue/',
+    is_external        = false,
+    format             = 'PARQUET',
+    write_compression  = 'SNAPPY',
+    partitioning       = ARRAY['city']
+)
+AS
+SELECT
+    order_date,
+    city,
+    total_orders,
+    total_revenue,
+    avg_order_value,
+    largest_order
+FROM swiggy_gold_db.daily_city_revenue;
+-- Expected: ~600 rows created
+-- Data scanned: reads from gold Parquet, writes to Iceberg format
+
+
+-- 4C. Verify the Iceberg table
+SELECT COUNT(*) AS row_count
+FROM   swiggy_iceberg_db.daily_city_revenue;
+
+SELECT order_date, city, total_orders, total_revenue
+FROM   swiggy_iceberg_db.daily_city_revenue
+WHERE  city = 'Bangalore'
+ORDER BY order_date DESC
+LIMIT 5;
+
+
+-- 4D. Check Iceberg table metadata (what makes it Iceberg)
+-- This reads the manifest files — Iceberg's metadata layer
+SELECT *
+FROM "swiggy_iceberg_db"."daily_city_revenue$files"
+LIMIT 10;
+-- Shows the Parquet files tracked by Iceberg's metadata layer
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BLOCK 5 — ICEBERG FEATURES
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- ── TIME TRAVEL ────────────────────────────────────────────────────────────────
+
+-- 5A. Check current snapshot (before any changes)
+SELECT * FROM "swiggy_iceberg_db"."daily_city_revenue$snapshots"
+ORDER BY committed_at DESC;
+-- Shows snapshot_id and committed_at timestamp
+-- Note the snapshot_id — you'll use it for time travel
+
+
+-- 5B. Simulate a data update — INSERT some new rows
+INSERT INTO swiggy_iceberg_db.daily_city_revenue
+VALUES
+    (DATE '2024-12-11', 'Bangalore', 312, 187450.00, 601.44, 4200.00),
+    (DATE '2024-12-11', 'Mumbai',    287, 171200.00, 596.51, 3950.00),
+    (DATE '2024-12-11', 'Hyderabad', 198, 118500.00, 598.48, 3100.00);
+-- 3 new rows representing Dec 11 data that just arrived
+
+
+-- 5C. Verify the INSERT landed
+SELECT COUNT(*) FROM swiggy_iceberg_db.daily_city_revenue;
+-- Should be original count + 3
+
+
+-- 5D. Check snapshots again — new snapshot appeared
+SELECT * FROM "swiggy_iceberg_db"."daily_city_revenue$snapshots"
+ORDER BY committed_at DESC;
+-- Now shows 2 snapshots — original CTAS + this INSERT
+-- Note the snapshot_id of the ORIGINAL (first) snapshot
+
+
+-- 5E. TIME TRAVEL — query data AS OF the original snapshot
+-- Replace <original_snapshot_id> with the ID from step 5D
+SELECT COUNT(*) AS row_count_before_insert
+FROM swiggy_iceberg_db.daily_city_revenue
+FOR VERSION AS OF <original_snapshot_id>;
+-- Returns original count — the INSERT is invisible
+-- This is time travel. The table "remembers" its past states.
+
+
+-- 5F. TIME TRAVEL — query AS OF a specific timestamp
+-- Replace the timestamp with something between CTAS and INSERT
+SELECT COUNT(*) AS row_count_at_time
+FROM swiggy_iceberg_db.daily_city_revenue
+FOR TIMESTAMP AS OF TIMESTAMP '2024-12-11 00:00:00 UTC';
+-- Returns pre-INSERT count if timestamp is before the INSERT committed
+
+
+-- 5G. Simulate a DELETE — remove one city's data to show recovery
+DELETE FROM swiggy_iceberg_db.daily_city_revenue
+WHERE city = 'Hyderabad' AND order_date = DATE '2024-12-11';
+
+-- Verify it's gone
+SELECT * FROM swiggy_iceberg_db.daily_city_revenue
+WHERE city = 'Hyderabad' AND order_date = DATE '2024-12-11';
+-- Returns 0 rows
+
+-- Recover it via time travel — go back to snapshot before DELETE
+-- Replace <pre_delete_snapshot_id> with snapshot ID before the DELETE
+INSERT INTO swiggy_iceberg_db.daily_city_revenue
+SELECT *
+FROM swiggy_iceberg_db.daily_city_revenue
+FOR VERSION AS OF <pre_delete_snapshot_id>
+WHERE city = 'Hyderabad' AND order_date = DATE '2024-12-11';
+
+-- Verify recovery
+SELECT * FROM swiggy_iceberg_db.daily_city_revenue
+WHERE city = 'Hyderabad' AND order_date = DATE '2024-12-11';
+-- Row is back
+
+
+-- ── SCHEMA EVOLUTION ───────────────────────────────────────────────────────────
+
+-- 5H. Add a new column to the Iceberg table (LIVE, no rewrite)
+ALTER TABLE swiggy_iceberg_db.daily_city_revenue
+ADD COLUMNS (day_of_week VARCHAR);
+-- Instant — no data rewrite. Iceberg tracks schema versions in metadata.
+-- Existing rows have NULL for the new column.
+
+
+-- 5I. Verify the new column exists
+SELECT order_date, city, total_revenue, day_of_week
+FROM   swiggy_iceberg_db.daily_city_revenue
+WHERE  city = 'Bangalore'
+LIMIT 5;
+-- day_of_week shows NULL for existing rows — expected
+
+
+-- 5J. Populate the new column for new inserts going forward
+INSERT INTO swiggy_iceberg_db.daily_city_revenue
+VALUES (DATE '2024-12-12', 'Bangalore', 298, 178800.00, 599.66, 3800.00, 'Thursday');
+-- New row has day_of_week populated; old rows still have NULL
+-- Both coexist in the same table — this is schema evolution
+
+
+-- 5K. Rename a column (Iceberg supports this — Parquet tables don't)
+ALTER TABLE swiggy_iceberg_db.daily_city_revenue
+RENAME COLUMN largest_order TO max_order_value;
+-- Instant rename. No data moved. Metadata updated.
+-- Try this on a regular Parquet table in swiggy_gold_db — it fails.
+
+
+-- ── ICEBERG vs PARQUET COMPARISON ──────────────────────────────────────────────
+
+-- 5L. Try the same operations on the regular Parquet gold table
+-- This demonstrates what Iceberg enables that plain Parquet can't
+
+-- Try INSERT into regular Parquet table
+-- INSERT INTO swiggy_gold_db.daily_city_revenue VALUES (...);
+-- → ERROR: Athena cannot write to non-Iceberg tables via DML
+
+-- Try DELETE from regular Parquet table
+-- DELETE FROM swiggy_gold_db.daily_city_revenue WHERE city = 'Bangalore';
+-- → ERROR: DELETE not supported for non-Iceberg tables
+
+-- Try ALTER TABLE ADD COLUMNS on regular Parquet table
+-- ALTER TABLE swiggy_gold_db.daily_city_revenue ADD COLUMNS (new_col VARCHAR);
+-- → This works syntactically but doesn't add to existing files — partial evolution
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BLOCK 6 — FEDERATED QUERY (CONCEPT ONLY — no hands-on build today)
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- What federated query would look like IF we set up the Lambda connector:
+-- (Don't run this — Lambda data source not configured)
+
+-- SELECT o.order_id, o.total_amount, f.rating, f.sentiment
+-- FROM   swiggy_silver_db.orders o
+-- JOIN   "lambda:swiggy-postgres-connector".swiggy_external.customer_feedback f
+--        ON o.customer_id = f.customer_id
+-- WHERE  f.sentiment = 'negative'
+-- AND    o.total_amount > 1000;
+
+-- The point: Athena can query Postgres directly without a Glue ETL job.
+-- Same SQL syntax. Results materialize in Athena.
+-- Covered in depth in Section 11 (Lambda + advanced Athena).
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- BONUS — ATHENA INTERVIEW QUERIES
+-- ───────────────────────────────────────────────────────────────────────────────
+
+-- B1. Show top 5 revenue days across all cities
+SELECT order_date, SUM(total_revenue) AS daily_total
+FROM   swiggy_gold_db.daily_city_revenue
+GROUP BY order_date
+ORDER BY daily_total DESC
+LIMIT 5;
+
+
+-- B2. City with most VIP customers
+SELECT city, COUNT(*) AS vip_count
+FROM   swiggy_gold_db.customer_segments
+WHERE  segment = 'VIP'
+GROUP BY city
+ORDER BY vip_count DESC
+LIMIT 3;
+
+
+-- B3. Average order value trend — week over week
+SELECT
+    DATE_TRUNC('week', order_date) AS week_start,
+    city,
+    ROUND(AVG(avg_order_value), 2) AS weekly_avg
+FROM swiggy_gold_db.daily_city_revenue
+GROUP BY DATE_TRUNC('week', order_date), city
+ORDER BY city, week_start;
+
+
+-- B4. Cross-source: negative feedback from high-value customers
+SELECT
+    cs.customer_id,
+    cs.customer_name,
+    cs.segment,
+    cs.total_spent,
+    cf.rating,
+    cf.feedback_text
+FROM swiggy_gold_db.customer_segments cs
+JOIN swiggy_silver_db.customer_feedback cf
+    ON cs.customer_id = cf.customer_id
+WHERE cs.segment = 'VIP'
+AND   cf.sentiment = 'negative'
+ORDER BY cs.total_spent DESC;
+-- Business value: identify VIP customers at churn risk
+
+
+-- B5. Iceberg time travel for audit — who changed what and when
+SELECT snapshot_id, committed_at, operation, summary
+FROM   "swiggy_iceberg_db"."daily_city_revenue$snapshots"
+ORDER BY committed_at;
+-- Full audit trail of every change to the Iceberg table
+-- This is what compliance teams love about Iceberg
