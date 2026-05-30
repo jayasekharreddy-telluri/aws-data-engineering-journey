@@ -1,0 +1,346 @@
+AMAZON REDSHIFT — 5 MINUTE MEMORY SHEET
+
+─────────────────────────────────
+
+1. WHY REDSHIFT?
+   ─────────────────────────────────
+
+Application Data
+↓
+Huge Growth
+↓
+Need Analytics
+↓
+Redshift
+
+Purpose:
+→ Analytics & Reporting
+
+Interview:
+Redshift = AWS Data Warehouse
+
+─────────────────────────────────
+2. OLTP vs OLAP
+─────────────────────────────────
+
+OLTP
+→ Run Business
+→ INSERT, UPDATE, DELETE
+→ PostgreSQL, MySQL
+
+OLAP
+→ Analyze Business
+→ SUM, COUNT, AVG
+→ Redshift
+
+Interview:
+OLTP = Operations
+OLAP = Analytics
+
+─────────────────────────────────
+3. REDSHIFT ARCHITECTURE
+─────────────────────────────────
+
+User
+↓
+Leader Node
+↓
+Compute Nodes
+↓
+Slices
+
+Leader Node
+→ Receives SQL
+→ Creates Plan
+→ Combines Results
+
+Compute Node
+→ Stores Data
+→ Executes Queries
+
+Slice
+→ Smallest Worker
+→ Parallel Processing
+
+Interview:
+Leader = Manager
+Compute = Worker
+Slice = Parallel Worker
+
+─────────────────────────────────
+4. WHY REDSHIFT IS FAST
+─────────────────────────────────
+
+MPP
++
+Columnar Storage
++
+Compression
++
+DISTKEY
++
+SORTKEY
+
+─────────────────────────────────
+5. MPP
+─────────────────────────────────
+
+1 Server
+↓
+Slow
+
+Many Servers
+↓
+Parallel Processing
+↓
+Fast
+
+Interview:
+MPP = Multiple Nodes Process Data Together
+
+─────────────────────────────────
+6. COLUMNAR STORAGE
+─────────────────────────────────
+
+Traditional DB
+↓
+Read Entire Row
+
+Redshift
+↓
+Read Required Columns Only
+
+Example:
+
+SELECT SUM(amount)
+
+Reads:
+✓ amount
+
+Skips:
+✗ city
+✗ customer_id
+
+Benefit:
+↓
+Less I/O
+
+─────────────────────────────────
+7. COMPRESSION
+─────────────────────────────────
+
+More Compression
+↓
+Less Data Read
+↓
+Faster Query
+
+Interview:
+Compression Reduces Disk I/O
+
+─────────────────────────────────
+8. DISTRIBUTION STYLE
+─────────────────────────────────
+
+Question:
+Where Should Data Live?
+
+Answer:
+Distribution Style
+
+Purpose:
+↓
+Reduce Data Movement
+
+─────────────────────────────────
+9. DISTSTYLE EVEN
+─────────────────────────────────
+
+Rows
+↓
+Equal Distribution
+
+Use:
+→ Staging Tables
+
+─────────────────────────────────
+10. DISTSTYLE KEY
+─────────────────────────────────
+
+Rows
+↓
+Distributed By DISTKEY
+
+Use:
+→ Large Joined Tables
+
+Rule:
+DISTKEY = JOIN Column
+
+Good:
+✓ customer_id
+✓ restaurant_id
+
+Bad:
+✗ city
+✗ status
+
+─────────────────────────────────
+11. DISTSTYLE ALL
+─────────────────────────────────
+
+Small Table
+↓
+Copy Everywhere
+
+Use:
+→ Lookup Tables
+→ Dimension Tables
+
+Example:
+city
+country
+calendar
+
+─────────────────────────────────
+12. DATA SKEW
+─────────────────────────────────
+
+Bad DISTKEY
+↓
+Uneven Distribution
+↓
+One Slice Works More
+↓
+Slow Query
+
+Avoid:
+Low Cardinality Columns
+
+─────────────────────────────────
+13. SORTKEY
+─────────────────────────────────
+
+Question:
+How Should Data Be Ordered?
+
+Answer:
+SORTKEY
+
+Rule:
+SORTKEY = WHERE Column
+
+Example:
+order_date
+
+─────────────────────────────────
+14. ZONE MAPS
+─────────────────────────────────
+
+Stores:
+Min Value
+Max Value
+
+For Every Block
+
+Purpose:
+Know Which Blocks To Skip
+
+─────────────────────────────────
+15. BLOCK PRUNING
+─────────────────────────────────
+
+WHERE order_date='2025-11-15'
+
+↓
+
+Skip Unnecessary Blocks
+
+↓
+
+Read Relevant Blocks Only
+
+↓
+
+Faster Query
+
+Flow:
+
+SORTKEY
+↓
+Zone Maps
+↓
+Block Pruning
+↓
+Less I/O
+
+─────────────────────────────────
+16. COPY COMMAND
+─────────────────────────────────
+
+S3
+↓
+COPY
+↓
+Redshift
+
+Purpose:
+Bulk Data Loading
+
+COPY
+→ Millions/Billions Rows
+
+INSERT
+→ Few Rows
+
+Interview:
+COPY Uses Cluster Parallelism
+
+─────────────────────────────────
+TABLE DESIGN RULES
+─────────────────────────────────
+
+DISTKEY
+→ JOIN Column
+
+SORTKEY
+→ WHERE Column
+
+Small Table
+→ DISTSTYLE ALL
+
+Staging Table
+→ DISTSTYLE EVEN
+
+Large Joined Table
+→ DISTSTYLE KEY
+
+─────────────────────────────────
+FINAL MEMORY FLOW
+─────────────────────────────────
+
+OLTP
+↓
+Generate Data
+
+OLAP
+↓
+Analyze Data
+
+Redshift
+↓
+MPP
+↓
+Columnar Storage
+↓
+Compression
+↓
+DISTKEY (Where Data Goes)
+↓
+SORTKEY (How Data Is Ordered)
+↓
+Zone Maps
+↓
+Block Pruning
+↓
+Fast Analytics
