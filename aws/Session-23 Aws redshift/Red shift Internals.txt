@@ -1,0 +1,597 @@
+# Amazon Redshift — 5 Minute Interview Memory Notes
+
+## Architecture Flow
+
+```text
+S3
+ ↓
+COPY / Spectrum
+ ↓
+Redshift Serverless
+ ↓
+Workgroup (Compute)
+ ↓
+Namespace (Metadata)
+ ↓
+Schema
+ ↓
+Tables
+ ↓
+Queries
+```
+
+---
+
+# Namespace vs Workgroup
+
+```text
+Namespace
+   ↓
+Database Metadata
+
+Stores:
+- DB
+- Schema
+- Tables
+- Users
+- Roles
+
+Workgroup
+   ↓
+Compute Layer
+
+Provides:
+- RPUs
+- Query Execution
+- Network
+```
+
+### Interview
+
+```text
+Namespace = Metadata
+
+Workgroup = Compute
+```
+
+---
+
+# COPY
+
+```text
+S3
+ ↓
+IAM Role
+ ↓
+COPY
+ ↓
+Redshift Table
+```
+
+Purpose:
+
+```text
+Bulk Data Loading
+```
+
+Important:
+
+```sql
+COPY table
+FROM 's3://...'
+IAM_ROLE '...'
+```
+
+Common Options:
+
+```text
+IGNOREHEADER
+DATEFORMAT
+NULL AS ''
+```
+
+Interview:
+
+```text
+COPY = Fast Parallel Data Load
+```
+
+---
+
+# DISTKEY
+
+Purpose:
+
+```text
+Distribute Rows Across Nodes
+```
+
+Goal:
+
+```text
+Reduce Data Movement
+```
+
+Best For:
+
+```text
+JOIN Columns
+High Cardinality
+```
+
+Good:
+
+```text
+customer_id
+restaurant_id
+order_id
+```
+
+Bad:
+
+```text
+status
+gender
+country
+```
+
+Problem:
+
+```text
+Low Cardinality
+      ↓
+Data Skew
+      ↓
+Slow Queries
+```
+
+Interview:
+
+```text
+DISTKEY → Faster JOINs
+```
+
+---
+
+# SORTKEY
+
+Purpose:
+
+```text
+Store Data In Order
+```
+
+Flow:
+
+```text
+SORTKEY
+   ↓
+Zone Maps
+   ↓
+Less Scan
+   ↓
+Faster Queries
+```
+
+Best For:
+
+```text
+WHERE
+BETWEEN
+Date Filters
+```
+
+Good:
+
+```text
+order_date
+created_date
+transaction_date
+```
+
+Interview:
+
+```text
+SORTKEY → Faster Filters
+```
+
+---
+
+# DISTKEY vs SORTKEY
+
+| DISTKEY        | SORTKEY      |
+| -------------- | ------------ |
+| Distribution   | Sorting      |
+| JOIN           | WHERE        |
+| Reduce Network | Reduce Scan  |
+| Across Nodes   | Inside Nodes |
+
+---
+
+# Spectrum
+
+Purpose:
+
+```text
+Query S3 Directly
+```
+
+Flow:
+
+```text
+S3
+ ↓
+Glue Catalog
+ ↓
+External Schema
+ ↓
+Spectrum
+ ↓
+SQL
+```
+
+Use:
+
+```text
+Historical Data
+Archive Data
+Data Lake
+```
+
+Avoid:
+
+```text
+Dashboards
+Frequent Queries
+```
+
+Interview:
+
+```text
+Spectrum = Query S3 Without Loading
+```
+
+---
+
+# Serverless & RPU
+
+```text
+RPU
+ ↓
+Compute Capacity
+```
+
+```text
+Base RPU
+ ↓
+Minimum Capacity
+```
+
+```text
+Max RPU
+ ↓
+Auto Scale Limit
+```
+
+Interview:
+
+```text
+RPU = CPU + Memory + Query Capacity
+```
+
+---
+
+# WLM
+
+Purpose:
+
+```text
+Manage Query Execution
+```
+
+Controls:
+
+```text
+Queue
+Memory
+Concurrency
+Priority
+```
+
+Flow:
+
+```text
+Users
+ ↓
+Queries
+ ↓
+WLM
+ ↓
+Execution
+```
+
+Interview:
+
+```text
+WLM = Query Traffic Controller
+```
+
+---
+
+# VACUUM
+
+Problem:
+
+```text
+COPY / INSERT
+      ↓
+Unsorted Data
+```
+
+Solution:
+
+```sql
+VACUUM SORT ONLY
+```
+
+Problem:
+
+```text
+DELETE
+      ↓
+Dead Rows
+```
+
+Solution:
+
+```sql
+VACUUM DELETE ONLY
+```
+
+Interview:
+
+```text
+VACUUM = Physical Storage Optimization
+```
+
+---
+
+# ANALYZE
+
+Purpose:
+
+```text
+Update Statistics
+```
+
+Flow:
+
+```text
+Data Change
+     ↓
+ANALYZE
+     ↓
+Fresh Statistics
+     ↓
+Better Query Plan
+```
+
+Interview:
+
+```text
+ANALYZE = Optimizer Intelligence
+```
+
+---
+
+# VACUUM vs ANALYZE
+
+| VACUUM           | ANALYZE               |
+| ---------------- | --------------------- |
+| Sort Data        | Update Stats          |
+| Remove Dead Rows | Update Optimizer Info |
+| Physical         | Logical               |
+
+---
+
+# Users & Roles
+
+```text
+User
+ ↓
+Person/Login
+
+Role
+ ↓
+Permission Bundle
+```
+
+Best Practice:
+
+```text
+Role
+ ↓
+Assign Users
+```
+
+Not:
+
+```text
+User
+ ↓
+Direct Permissions
+```
+
+Interview:
+
+```text
+Role = Collection Of Permissions
+```
+
+---
+
+# Permission Model
+
+```text
+Schema
+   ↓
+Table
+   ↓
+Column
+```
+
+Required:
+
+```sql
+GRANT USAGE ON SCHEMA
+GRANT SELECT ON TABLE
+```
+
+Common Mistake:
+
+```text
+SELECT Granted
+No Schema USAGE
+       ↓
+Permission Denied
+```
+
+---
+
+# EXPLAIN
+
+Purpose:
+
+```text
+See Query Execution Plan
+```
+
+Flow:
+
+```text
+SQL
+ ↓
+Optimizer
+ ↓
+EXPLAIN
+ ↓
+Execution
+```
+
+Important Operators:
+
+```text
+Seq Scan
+ ↓
+Table Scan
+
+Hash Join
+ ↓
+Most Common Join
+
+Merge Join
+ ↓
+Fastest (Sorted Data)
+
+Nested Loop
+ ↓
+Usually Bad
+```
+
+Distribution Indicators:
+
+```text
+DS_DIST_INNER
+ ↓
+Data Movement
+
+DS_BCAST_INNER
+ ↓
+Broadcast Small Table
+```
+
+Interview:
+
+```text
+EXPLAIN = Find Bottlenecks Before Execution
+```
+
+---
+
+# Performance Tuning Flow
+
+```text
+Slow Query
+    ↓
+EXPLAIN
+    ↓
+DISTKEY
+    ↓
+SORTKEY
+    ↓
+ANALYZE
+    ↓
+VACUUM
+    ↓
+WLM
+```
+
+Check:
+
+```text
+DS_DIST_INNER
+Data Skew
+Unsorted %
+Stats Off %
+Queue Wait
+```
+
+---
+
+# Interview One-Liners
+
+```text
+COPY → Load Data
+
+DISTKEY → Faster JOINs
+
+SORTKEY → Faster Filters
+
+Spectrum → Query S3
+
+RPU → Compute Unit
+
+WLM → Query Management
+
+VACUUM → Storage Health
+
+ANALYZE → Statistics Health
+
+Role → Permission Bundle
+
+EXPLAIN → Query Plan
+
+DS_DIST_INNER → Data Movement
+
+Data Skew → Bad DISTKEY
+
+Zone Maps → Less Data Scan
+```
+
+---
+
+# Final Memory Line
+
+```text
+Data Load → COPY
+JOIN Performance → DISTKEY
+Filter Performance → SORTKEY
+Storage Health → VACUUM
+Statistics Health → ANALYZE
+Query Control → WLM
+Query Troubleshooting → EXPLAIN
+Large S3 Data → Spectrum
+Security → Roles & Permissions
+Compute → Workgroup/RPU
+Metadata → Namespace
+```
