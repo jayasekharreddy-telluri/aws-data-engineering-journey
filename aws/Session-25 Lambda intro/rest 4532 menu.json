@@ -1,0 +1,10 @@
+{
+  "restaurant_id": "RST4521",
+  "restaurant_name": "Arjun Kitchen",
+  "city": "Bangalore",
+  "items": [
+    { "id": "I001", "name": "Masala Dosa",  "price": 89  },
+    { "id": "I002", "name": "Filter Coffee", "price": 45  }
+  ],
+  "updated_at": "2026-05-12T10:30:00Z"
+}

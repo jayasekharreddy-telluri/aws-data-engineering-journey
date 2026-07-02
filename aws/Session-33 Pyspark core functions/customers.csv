@@ -1,0 +1,13 @@
+customer_id,customer_name,city,signup_date,membership_tier,total_orders
+C001,Arjun Sharma,Mumbai,2022-03-15,Gold,45
+C002,Priya Patel,Delhi,2021-08-20,Silver,28
+C003,Rahul Mehta,Mumbai,2023-01-10,Bronze,12
+C004,Sneha Reddy,Bangalore,2022-06-05,Gold,67
+C005,Vikram Nair,Hyderabad,2021-11-30,Silver,33
+C006,Ananya Das,Chennai,2023-04-18,Bronze,8
+C007,Kiran Kumar,Bangalore,2022-09-22,Silver,21
+C008,Meera Iyer,Chennai,2021-05-14,Gold,89
+C009,Aditya Singh,Delhi,2023-07-03,Bronze,5
+C010,Pooja Gupta,Mumbai,2022-12-09,Silver,17
+C011,Rohit Verma,Delhi,2021-03-27,Gold,112
+C012,Divya Krishnan,Mumbai,2023-02-14,Bronze,9

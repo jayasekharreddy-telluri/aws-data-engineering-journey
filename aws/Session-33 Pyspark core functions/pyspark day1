@@ -1,0 +1,83 @@
+# Databricks notebook source
+from pyspark.sql.functions import *
+
+# COMMAND ----------
+
+orders_raw = spark.read.csv("/Volumes/keystone_aws_class/schema1/upload/orders.csv")
+
+# COMMAND ----------
+
+orders_raw.printSchema()
+
+# COMMAND ----------
+
+orders_raw = spark.read.option("header", True).option("inferSchema", True).csv("/Volumes/keystone_aws_class/schema1/upload/orders.csv")
+orders_raw.printSchema()
+
+# COMMAND ----------
+
+orders_raw.display()
+
+# COMMAND ----------
+
+print(orders_raw.dtypes)
+
+# COMMAND ----------
+
+print(orders_raw.columns)
+
+# COMMAND ----------
+
+orders_raw.show(6)
+
+# COMMAND ----------
+
+print(orders_raw.count())
+
+# COMMAND ----------
+
+orders_raw.select("order_id", "customer_id", "order_amount", "status").show(5)
+
+# COMMAND ----------
+
+df1 = orders_raw.select("order_id", "customer_id", "order_amount", "status")
+df1.display()
+
+# COMMAND ----------
+
+df1 = orders_raw.select(col("order_id"), col("customer_id"), col("order_amount"), col("status"))
+df1.display()
+
+# COMMAND ----------
+
+orders_raw.select(col("order_id").alias("id"), col("order_amount").alias("amount")).show(5)
+
+# COMMAND ----------
+
+orders_raw.select(col("order_id"), col("order_amount"), (col("order_amount") * 0.18).alias("gst_amount")).show()
+
+# COMMAND ----------
+
+df11 = orders_raw.withColumn("gst_amount", col("order_amount") * 0.18)
+df11.display()
+
+# COMMAND ----------
+
+orders_raw = orders_raw.withColumn("gst_amount", col("order_amount") * 0.18)
+orders_raw.display()
+
+# COMMAND ----------
+
+orders_raw = orders_raw.withColumnRenamed("gst_amount", "gst")
+
+# COMMAND ----------
+
+orders_raw.display()
+
+# COMMAND ----------
+
+orders_raw = orders_raw.withColumn("order_amount", col("order_amount") * 1.10 )
+orders_raw.display()
+
+# COMMAND ----------
+

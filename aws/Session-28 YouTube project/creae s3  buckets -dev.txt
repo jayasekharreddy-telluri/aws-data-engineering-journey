@@ -1,0 +1,178 @@
+creae s3  buckets -dev
+ yt-data-pipeline-bronze-ap-south-1-dev--create life cycle management--name archeiveoldrawdata
+
+ yt-data-pipeline-silve-ap-south-1-dev
+
+ yt-data-pipeline-gold-ap-south-1-dev
+
+enable versioning to all
+
+
+--step 2:
+
+instal aws cli to upload local files to s3
+
+--step 3:
+
+create user: aws cli local
+
+ attach policy as admistatrve policy
+
+Access key:
+
+AKIA4MMNM4SK6XTDCITN
+
+Secret access key:
+
+KtqmpH4Xj6Nqgn3sG25vod17IFrtLjGdehy4HRgu
+
+security creatsend-access keys-command line
+
+create access key
+
+ conncec from command line with access key
+
+in zip file
+in script folder -> aws_copy
+we coomnds to upload files upload them
+
+
+----------------next lamad role:-------------------------
+
+yt-data-pipeline-lamda-role-dev-jai--copy skelton from i am folder of project folder
+
+with s3 read access and later after adding inline we can delete read policy
+
+give inline polices to access:
+ s3
+glue
+sns
+athena
+
+open sns :
+
+create topic : yt-pipeline
+create subscription with email -varshitjai@gmail.com
+
+now--add inline polices to "yt-data-pipeline-lamda-role-dev-jai" role
+
+-----------next create lamda to read data from s3----------------
+
+yt-pipeline-lamda-json-to-parque
+
+pyhton 3.12,
+
+then copyt the python code from our project folder lamdas-jsont to parquet
+
+
+
+----------create role for glue--------------DAY-2----------
+
+yt-data-pipeline-glue-dev-role
+
+	-> AWS GLUE SERVICE ROLE
+	-> INLINE POLICY COPY FROM PROJECT FOLDER
+
+yt-data-pipeline-sns-dev-role
+
+	-> add inline from project folder
+
+-------------glue databases ------------------
+
+go to glue and create 3 dbs for bronze,sliver,gold
+
+like yt_pipeline_bronze_dev
+
+
+--------glue crowler-------------
+
+ yt_data_pipeline_bronze_crawler_dev created it, getting error while reading data from s3
+
+	--> bronze db
+	--> source s3
+
+but i got error and solving it
+
+------------------------------day 3-----------------
+
+resolved it by help of lake formation and  we used it key adim account 
+
+lake formation is creating issue, we remived and crawler running
+
+
+next
+
+	-------getting data from youtube api-----------
+
+create  google console and create project
+
+API key : AIzaSyARg3h5PBYDGPLrXc3a2rKWjP04yfeDBB8
+
+	-------create lamda to get data from lamda-----
+
+
+yt-data-pipeline-youtube-ingestion-dev
+
+add the code from out project folder lamda
+
+the  do general setting memro 1024 and 512 mb,timout 5min
+
+add environment variables
+
+create past code and deploy it and create event and test it 
+
+and check s3 for data coming or not
+
+next second lamda  for already created json paruqute
+
+	- do same confgirario and deploy  and test it
+
+it is working fine
+	
+	-------create etl job for writng s3 stattcics table to silver
+		yt_bronze_to_silver_statistics
+
+	copy the code from project folder glue jobs
+
+job succeful 
+
+	-------now create lamda for data quality checking-------------
+
+	create lamda for dq------yt_pipeline_dq_lamda
+
+	do general config and envi variables
+	
+
+
+------------day 4--------------
+
+yt_pipeline_dq_lamda - test it 
+
+fixed persmmison related errors
+
+	--next create etl pipleline 
+		name: yt_silver_to_gold_aggr
+	copied code from project folder and etl job run succefull
+
+
+---next step function ---
+
+create --yt_data_pipeline_orch
+
+
+
+	
+
+
+	
+
+
+
+
+
+
+
+
+
+
+

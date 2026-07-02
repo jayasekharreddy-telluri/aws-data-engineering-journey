@@ -1,0 +1,245 @@
+# AWS YouTube Data Pipeline Project (DEV)
+
+## Step 1: Create S3 Buckets
+
+Create the following S3 buckets:
+
+* yt-data-pipeline-bronze-ap-south-1-dev
+
+  * Create Lifecycle Management
+  * Rule Name: archiveOldRawData
+
+* yt-data-pipeline-silver-ap-south-1-dev
+
+* yt-data-pipeline-gold-ap-south-1-dev
+
+Enable Versioning on all buckets.
+
+---
+
+## Step 2: Install AWS CLI
+
+Install AWS CLI to upload local files to S3.
+
+---
+
+## Step 3: Create IAM User for AWS CLI
+
+Create User:
+
+* aws-cli-local
+
+Attach Policy:
+
+* AdministratorAccess
+
+Create Access Keys:
+
+* Access Key
+* Secret Access Key
+
+Create Access Key for:
+
+* Command Line Interface (CLI)
+
+Connect AWS CLI using the Access Key and Secret Key.
+
+From the project ZIP file:
+
+scripts/aws_copy
+
+Run the commands provided there to upload files to S3.
+
+---
+
+# Lambda Role
+
+Create Role:
+
+* yt-data-pipeline-lambda-role-dev-jai
+
+Copy the IAM skeleton policy from the project folder.
+
+Initially provide:
+
+* S3 Read Access
+
+Later add Inline Policies for:
+
+* S3
+* Glue
+* SNS
+* Athena
+
+After adding inline policies, remove the temporary S3 Read policy.
+
+---
+
+# SNS Setup
+
+Create SNS Topic:
+
+* yt-pipeline
+
+Create Subscription:
+
+* Email: [varshitjai@gmail.com](mailto:varshitjai@gmail.com)
+
+Add the required inline policies to:
+
+* yt-data-pipeline-lambda-role-dev-jai
+
+---
+
+# Create Lambda to Read Data from S3
+
+Lambda Name:
+
+* yt-pipeline-lambda-json-to-parquet
+
+Runtime:
+
+* Python 3.12
+
+Copy the Python code from:
+
+project-folder/lambdas/json-to-parquet
+
+Deploy the Lambda.
+
+---
+
+# Day 2
+
+## Create Glue Role
+
+Role Name:
+
+* yt-data-pipeline-glue-dev-role
+
+Configuration:
+
+* AWS Glue Service Role
+* Copy Inline Policy from project folder
+
+---
+
+## Create SNS Role
+
+Role Name:
+
+* yt-data-pipeline-sns-dev-role
+
+Configuration:
+
+* Add Inline Policy from project folder
+
+---
+
+## Create Glue Databases
+
+Create the following databases:
+
+* yt_pipeline_bronze_dev
+* yt_pipeline_silver_dev
+* yt_pipeline_gold_dev
+
+---
+
+## Create Glue Crawler
+
+Crawler Name:
+
+* yt_data_pipeline_bronze_crawler_dev
+
+Configuration:
+
+* Database → Bronze DB
+* Source → S3
+
+Initially received an error while reading data from S3.
+
+Resolved the issue using Lake Formation.
+
+Used the Keystone Admin account.
+
+Lake Formation permissions were causing the issue, so we removed them and the crawler started running successfully.
+
+---
+# Day 3
+
+# Getting Data from YouTube API
+
+Create a project in Google Cloud Console.
+
+Create API Key.
+
+---
+
+# Create Lambda for YouTube Data Ingestion
+
+Lambda Name:
+
+* yt-data-pipeline-youtube-ingestion-dev
+
+Copy the code from:
+
+project-folder/lambda
+
+General Configuration:
+
+* Memory: 1024 MB
+* Timeout: 5 Minutes
+
+Add Environment Variables.
+
+Deploy the code.
+
+Create a Test Event and execute it.
+
+Verify whether data is landing in S3.
+
+---
+
+# JSON to Parquet Lambda
+
+Use the already created JSON-to-Parquet Lambda.
+
+Apply the same configuration.
+
+Deploy and test.
+
+Verified that it is working successfully.
+
+---
+
+# Create Glue ETL Job
+
+Purpose:
+
+Write statistics data from Bronze S3 to Silver layer.
+
+Job Name:
+
+* yt_bronze_to_silver_statistics
+
+Copy the code from:
+
+project-folder/glue-jobs
+
+Job executed successfully.
+
+---
+
+# Create Data Quality Lambda
+
+Lambda Name:
+
+* yt_pipeline_dq_lambda
+
+Configuration:
+
+* General Settings
+* Environment Variables
+
+Deploy and configure for Data Quality checks.

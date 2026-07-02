@@ -1,0 +1,66 @@
+import json
+from urllib.parse import unquote_plus
+
+def lambda_handler(event, context):
+    for record in event['Records']:
+        bucket = record['s3']['bucket']['name']
+        key = unquote_plus(record['s3']['object']['key'])
+        print(f'Would process: s3://{bucket}/{key}')
+
+    return {'statusCode': 200, 'body': 'OK'}
+
+
+
+// S3 trigger event — raw JSON payload AWS sends to your handler
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "ap-south-1",
+      "eventName": "ObjectCreated:Put",
+      "s3": {
+        "bucket": {
+          "name": "swiggy-bronze-menu-updates",
+          "arn": "arn:aws:s3:::swiggy-bronze-menu-updates"
+        },
+        "object": {
+          "key": "restaurant_menus/bangalore/rest_4521_menu.json",
+          "size": 8192,
+          "eTag": "abc123"
+        }
+      }
+    }
+  ]
+}
+
+
+
+
+
+
+
+
+
+
+import json
+import boto3
+from urllib.parse import unquote_plus
+
+s3 = boto3.client('s3')   # init outside handler = warm-cached
+
+def lambda_handler(event, context):
+    for record in event['Records']:          # always loop — can be batched
+        bucket = record['s3']['bucket']['name']
+        raw_key = record['s3']['object']['key']
+        key = unquote_plus(raw_key)          # decode URL-encoded spaces/specials
+
+        print(f'Processing: s3://{bucket}/{key}')
+
+        response = s3.get_object(Bucket=bucket, Key=key)
+        content  = response['Body'].read().decode('utf-8')
+        data     = json.loads(content)
+
+        print(f'Menu items count: {len(data.get("items", []))}')
+
+    return {'statusCode': 200, 'body': f'Processed {len(event["Records"])} records'}

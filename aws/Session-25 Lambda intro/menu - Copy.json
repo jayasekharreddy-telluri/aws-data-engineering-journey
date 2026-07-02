@@ -1,0 +1,9 @@
+{
+  "restaurant_id": "RST2001",
+  "restaurant_name": "Lambda Cafe",
+  "city": "Hyderabad",
+  "items": [
+    { "id": "I001", "name": "Idli", "price": 40 },
+    { "id": "I002", "name": "Dosa", "price": 70 }
+  ]
+}

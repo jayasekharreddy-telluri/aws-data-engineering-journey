@@ -1,0 +1,10 @@
+restaurant_id,restaurant_name,city,cuisine_type,avg_rating,is_active
+R001,Masala Magic,Mumbai,North Indian,4.2,true
+R002,Delhi Darbar,Delhi,Mughlai,4.5,true
+R003,Mumbai Bites,Mumbai,Street Food,3.8,true
+R004,Spice Route,Bangalore,South Indian,4.7,true
+R005,Hyderabadi Dum,Hyderabad,Biryani,4.9,true
+R006,Chennai Express,Chennai,South Indian,4.1,true
+R007,Punjabi Tadka,Bangalore,North Indian,3.9,true
+R008,Royal Feast,Delhi,Continental,4.3,true
+R009,Coastal Kitchen,Mumbai,Seafood,,false

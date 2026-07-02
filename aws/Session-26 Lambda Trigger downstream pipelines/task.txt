@@ -1,0 +1,442 @@
+# AWS Lambda Day 2 - Practical Task Document
+
+# Practical Flow
+
+```text
+Create Lambda
+    ↓
+Environment Variables
+    ↓
+Lambda Layers
+    ↓
+Permanent Error Handling
+    ↓
+Transient Error Handling
+    ↓
+Create SQS Queue
+    ↓
+Configure DLQ
+    ↓
+Test DLQ
+    ↓
+Secrets Manager
+    ↓
+Glue Trigger
+```
+
+---
+
+# Task 1 — Environment Variables
+
+## What We Did
+
+* Opened Lambda Configuration
+* Added Environment Variables
+
+```text
+BUCKET_NAME = my-test-bucket
+ENVIRONMENT = dev
+```
+
+* Read variables inside Lambda using:
+
+```python
+os.environ.get()
+```
+
+* Printed values in CloudWatch Logs
+
+## Purpose
+
+Store configuration outside code.
+
+## Important Learning
+
+```text
+Code + Config should be separated
+
+Bucket Name → Env Variable
+Environment Name → Env Variable
+```
+
+---
+
+# Task 2 — Lambda Layers (Pandas)
+
+## What We Did
+
+* Opened Layers section
+* Added AWS Layer
+
+```text
+AWSSDKPandas-Python314
+Version 7
+```
+
+* Used pandas inside Lambda
+
+```python
+import pandas as pd
+```
+
+* Created DataFrame
+* Calculated average value
+
+## Purpose
+
+Use external libraries without packaging them manually.
+
+## Important Learning
+
+```text
+Layers = Shared Dependencies
+
+pandas
+numpy
+pyarrow
+awswrangler
+```
+
+### Error Faced
+
+```text
+No module named pandas
+```
+
+### Fix
+
+```text
+Attach AWS Pandas Layer
+Deploy Again
+```
+
+---
+
+# Task 3 — Permanent Error Handling
+
+## What We Did
+
+* Added JSON parsing logic
+
+```python
+json.loads()
+```
+
+* Created Good JSON test
+* Created Bad JSON test
+
+## Purpose
+
+Handle invalid input safely.
+
+## Important Learning
+
+```text
+Bad JSON
+    ↓
+Permanent Error
+    ↓
+Log + Skip
+```
+
+### Test Results
+
+```text
+Good JSON → 200
+Bad JSON → 400
+```
+
+---
+
+# Task 4 — Transient Error Handling
+
+## What We Did
+
+Created Lambda that always fails.
+
+```python
+raise Exception(
+    "Database Connection Failed"
+)
+```
+
+Observed failure in CloudWatch Logs.
+
+## Purpose
+
+Understand retryable failures.
+
+## Important Learning
+
+```text
+Database Down
+Network Timeout
+AWS Failure
+
+= Transient Error
+```
+
+Flow
+
+```text
+Raise Exception
+      ↓
+Retry
+```
+
+---
+
+# Task 5 — Create SQS Queue
+
+## What We Did
+
+Created Queue
+
+```text
+Name:
+lambda-day2-dlq
+
+Type:
+Standard
+```
+
+Generated Queue ARN.
+
+## Purpose
+
+Store failed events.
+
+## Important Learning
+
+```text
+DLQ = Backup Storage
+for Failed Events
+```
+
+---
+
+# Task 6 — Configure DLQ
+
+## What We Did
+
+Opened:
+
+```text
+Lambda
+ ↓
+Asynchronous Invocation
+```
+
+Configured:
+
+```text
+Retry Attempts = 2
+DLQ = lambda-day2-dlq
+```
+
+## Purpose
+
+Prevent event loss.
+
+## Important Learning
+
+```text
+Fail
+ ↓
+Retry
+ ↓
+Retry
+ ↓
+DLQ
+```
+
+### Error Faced
+
+```text
+Execution role does not have
+permission to SendMessage
+```
+
+### Fix
+
+Added SQS permission to Lambda role.
+
+```text
+AmazonSQSFullAccess
+```
+
+---
+
+# Task 7 — DLQ Testing
+
+## What We Did
+
+Created failing Lambda.
+
+```python
+raise Exception(
+    "DLQ Test Failure"
+)
+```
+
+Used:
+
+```text
+Asynchronous Invocation
+```
+
+Checked CloudWatch Logs.
+
+Polled SQS Queue.
+
+Verified failed event appeared in DLQ.
+
+## Purpose
+
+Validate retry + DLQ flow.
+
+## Important Learning
+
+```text
+Synchronous
+    ↓
+No DLQ
+
+Asynchronous
+    ↓
+DLQ Works
+```
+
+---
+
+# Task 8 — Secrets Manager
+
+## What We Did
+
+* Created Secret
+* Granted Lambda permission
+
+```text
+secretsmanager:GetSecretValue
+```
+
+* Read Secret from Lambda
+
+## Purpose
+
+Store sensitive values securely.
+
+## Important Learning
+
+```text
+Passwords
+API Keys
+Tokens
+
+→ Secrets Manager
+```
+
+```text
+Bucket Name
+Environment
+
+→ Env Variables
+```
+
+---
+
+# Task 9 — Glue Trigger
+
+## What We Did
+
+Configured Lambda to trigger Glue Job.
+
+```python
+glue.start_job_run()
+```
+
+## Purpose
+
+Start ETL processing automatically.
+
+## Important Learning
+
+```text
+Lambda = Orchestrator
+
+Glue = ETL Engine
+```
+
+---
+
+# Final Architecture Understanding
+
+```text
+S3 Upload
+     ↓
+Lambda Trigger
+     ↓
+Read Config
+(Environment Variables)
+     ↓
+Read Secrets
+(Secrets Manager)
+     ↓
+Validate Data
+     ↓
+Handle Errors
+     ↓
+Retry If Needed
+     ↓
+DLQ If Failed
+     ↓
+Enrich Data
+(Pandas Layer)
+     ↓
+Trigger Glue Job
+     ↓
+ETL Processing
+```
+
+---
+
+# Interview Cheat Sheet
+
+```text
+Environment Variables
+→ Non-Sensitive Config
+
+Secrets Manager
+→ Sensitive Data
+
+Layers
+→ Shared Dependencies
+
+Permanent Error
+→ Log + Skip
+
+Transient Error
+→ Retry
+
+DLQ
+→ Failed Async Events
+
+Lambda
+→ Orchestration
+
+Glue
+→ Processing
+```
+
+# Final Memory Line
+
+```text
+Config → Environment Variables
+Secrets → Secrets Manager
+Libraries → Layers
+Bad Data → Skip
+Temporary Failure → Retry
+Retry Failed → DLQ
+Lambda → Orchestrates
+Glue → Processes
+```

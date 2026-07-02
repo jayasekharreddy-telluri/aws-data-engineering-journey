@@ -1,0 +1,410 @@
+# AWS Lambda Day 2 – Ultra Short Memory Notes
+
+## Lambda Production Flow
+
+```text
+Config
+ ↓
+Dependencies
+ ↓
+Security
+ ↓
+Error Handling
+ ↓
+Retries
+ ↓
+DLQ
+ ↓
+Glue Trigger
+ ↓
+ETL Pipeline
+```
+
+---
+
+# Environment Variables
+
+```text
+Purpose
+ ↓
+Store Config Outside Code
+```
+
+Examples
+
+```text
+Bucket Name
+Glue Job Name
+Environment
+Log Level
+```
+
+Python
+
+```python
+os.environ['KEY']        → Required
+os.environ.get()         → Optional
+```
+
+Flow
+
+```text
+Code
+ ↓
+Read Config
+ ↓
+Execute
+```
+
+Interview One-Liner
+
+> Environment Variables store non-sensitive configuration outside code.
+
+---
+
+# Secrets Manager
+
+```text
+Purpose
+ ↓
+Store Sensitive Data
+```
+
+Store
+
+```text
+Passwords
+API Keys
+Tokens
+Database Credentials
+```
+
+Never Store In Env Vars
+
+```text
+Passwords ❌
+Tokens ❌
+API Keys ❌
+```
+
+Flow
+
+```text
+Lambda
+ ↓
+IAM Permission
+ ↓
+Secrets Manager
+ ↓
+Get Secret
+```
+
+Interview One-Liner
+
+> Secrets Manager provides encryption, rotation, and secure access control for secrets.
+
+---
+
+# Lambda Layers
+
+```text
+Purpose
+ ↓
+Share Dependencies
+```
+
+Contains
+
+```text
+pandas
+numpy
+pyarrow
+awswrangler
+```
+
+Flow
+
+```text
+Layer
+ ↓
+Attach to Lambda
+ ↓
+Libraries Available
+```
+
+Without Layer
+
+```text
+ModuleNotFoundError
+```
+
+Interview One-Liner
+
+> Lambda Layers are reusable dependency packages shared across functions.
+
+---
+
+# Error Handling
+
+## Permanent Error
+
+Examples
+
+```text
+Bad JSON
+Missing Field
+Invalid Schema
+```
+
+Flow
+
+```text
+Bad Data
+ ↓
+Log
+ ↓
+Skip
+```
+
+Rule
+
+```text
+No Retry
+```
+
+---
+
+## Transient Error
+
+Examples
+
+```text
+DB Down
+Network Timeout
+AWS API Failure
+```
+
+Flow
+
+```text
+Temporary Failure
+ ↓
+Raise Exception
+ ↓
+Retry
+```
+
+Rule
+
+```text
+Retry Required
+```
+
+Interview One-Liner
+
+> Permanent errors are skipped; transient errors are retried.
+
+---
+
+# DLQ (Dead Letter Queue)
+
+```text
+Purpose
+ ↓
+Prevent Event Loss
+```
+
+Flow
+
+```text
+Event
+ ↓
+Lambda
+ ↓
+Fail
+ ↓
+Retry
+ ↓
+Retry
+ ↓
+DLQ (SQS)
+```
+
+Stores
+
+```text
+Failed Events
+```
+
+Important
+
+```text
+Async Invocation → DLQ ✅
+Sync Invocation → DLQ ❌
+```
+
+Examples
+
+```text
+S3
+SNS
+EventBridge
+```
+
+Interview One-Liner
+
+> DLQ stores failed asynchronous events after retry attempts are exhausted.
+
+---
+
+# IAM Permissions
+
+Flow
+
+```text
+Lambda
+ ↓
+Action
+ ↓
+IAM Check
+ ↓
+Allow / Deny
+```
+
+Examples
+
+```text
+SQS        → sqs:SendMessage
+Secrets    → secretsmanager:GetSecretValue
+Glue       → glue:StartJobRun
+```
+
+Common Mistake
+
+```text
+Resource Created
+ ↓
+Permission Missing
+ ↓
+AccessDenied
+```
+
+---
+
+# Glue Trigger
+
+Purpose
+
+```text
+Event Driven ETL
+```
+
+Flow
+
+```text
+Lambda
+ ↓
+start_job_run()
+ ↓
+Glue Job
+ ↓
+Transformation
+```
+
+Interview One-Liner
+
+> Lambda orchestrates; Glue performs large-scale ETL.
+
+---
+
+# End-to-End ETL Architecture
+
+```text
+S3 Upload
+ ↓
+Lambda Trigger
+ ↓
+Validate
+ ↓
+Enrich
+ ↓
+Silver Layer
+ ↓
+Trigger Glue
+ ↓
+Gold Layer
+```
+
+---
+
+# Bronze → Silver → Gold
+
+### Bronze
+
+```text
+Raw Data
+```
+
+### Silver
+
+```text
+Cleaned Data
+Validated Data
+Enriched Data
+```
+
+### Gold
+
+```text
+Analytics Ready
+Reports
+Dashboards
+```
+
+Flow
+
+```text
+Bronze
+ ↓
+Lambda
+ ↓
+Silver
+ ↓
+Glue
+ ↓
+Gold
+```
+
+Interview One-Liner
+
+> Bronze stores raw data, Silver stores cleaned data, Gold stores business-ready data.
+
+---
+
+# Common Interview Questions
+
+| Question                     | Answer                      |
+| ---------------------------- | --------------------------- |
+| Env Vars vs Secrets Manager? | Config vs Sensitive Data    |
+| Why Layers?                  | Share Dependencies          |
+| Why DLQ?                     | Prevent Event Loss          |
+| Permanent Error?             | Log + Skip                  |
+| Transient Error?             | Retry                       |
+| Why Glue Trigger?            | Event-Driven ETL            |
+| Lambda vs Glue?              | Orchestration vs Processing |
+
+---
+
+# Final Memory Line
+
+```text
+Config → Env Vars
+Secrets → Secrets Manager
+Dependencies → Layers
+Bad Data → Skip
+Temporary Failure → Retry
+Retry Exhausted → DLQ
+Lambda → Orchestrates
+Glue → Processes
+Bronze → Silver → Gold
+```
