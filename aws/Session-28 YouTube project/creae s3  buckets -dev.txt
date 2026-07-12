@@ -20,11 +20,11 @@ create user: aws cli local
 
 Access key:
 
-AKIA4MMNM4SK6XTDCITN
+AKIA4MMNFDCSC4M4SK6XTDCITN
 
 Secret access key:
 
-KtqmpH4Xj6Nqgn3sG25vod17IFrtLjGdehy4HRgu
+KtqmpH4Xj6NVEGVEGVEqgn3sG25vod17IFrtLjGdehy4HRgu
 
 security creatsend-access keys-command line
 
